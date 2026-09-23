@@ -1,18 +1,19 @@
 --[[
     ===================================================================
-    ❄️ ANTARTICA HUB - MOUNTAIN MINING & UTILITY (v4.4 Complete Edition)
+    ❄️ ANTARTICA HUB - MOUNTAIN MINING & UTILITY (v4.5 Mountain Carver Edition)
     ===================================================================
     UI Library: WindUI (https://github.com/Footagesus/WindUI)
-    Dibuat untuk: Owner Game & Map Tester (Roblox Mountain Mining)
+    Dibuat untuk: Owner Game, Map Tester & Player (Roblox Mountain Mining)
     
-    Kelengkapan Tab WindUI (7 Tabs Lengkap):
+    Kelengkapan Tab WindUI (8 Tabs Lengkap):
       1. 🏃 Movement (Fly Toggle, D-Pad Toggle, Fly Speed, WalkSpeed, GodMode, Anti-Fall, Noclip)
-      2. ⛏️ Mining & Dig (Auto Dig, Pickaxe Power Boost Slider 5k, Auto Equip Tool)
-      3. 👥 Target Player (Player List Dropdown, Refresh List, TP to Target, Auto Follow/Spectate)
-      4. 🎒 Bag & Gems (Auto Mine Termahal, Filter Plot Kebun, Magnet Gem, Auto Return, Limit Slider)
-      5. 📍 Teleports & Shops (TP & Buka UI Toko Jual, Bom, Pickaxe, Upgrade, Radar, Peak, CFrame Copy)
-      6. ☀️ Map Inspector (TimeOfDay Slider 0-24, Fullbright, No Fog, Infinite Jump)
-      7. 🔍 Dev Scanner (Scan Remotes ke File/Clipboard, Count Crystals, Open Shop UI Remote Test)
+      2. ⛏️ Mining & Dig (Auto Dig + Maju Hancurkan Gunung, Power Boost Slider 20k, Auto Equip)
+      3. ⚡ Remote Hacks (Jetpack Thrust, Plasma Drill, Bomb Explode, Radar Pulse, Starfall, Meteor, Code Redeem)
+      4. 👥 Target Player (Player List Dropdown, Refresh List, TP to Target, Auto Follow/Spectate)
+      5. 🎒 Bag & Gems (Auto Mine Termahal, Filter Plot Kebun Strict, Magnet Gem, Auto Return)
+      6. 📍 Teleports & Shops (TP & Buka UI Toko Jual, Bom, Pickaxe, Upgrade, Radar, Peak, CFrame Copy)
+      7. ☀️ Map Inspector (TimeOfDay Slider 0-24, Fullbright, No Fog, Infinite Jump)
+      8. 🔍 Dev Scanner (Scan Remotes ke File/Clipboard, Count Crystals, Open Shop UI Remote Test)
     ===================================================================
 ]]
 
@@ -80,7 +81,7 @@ local function copyToRealClipboard(text)
     return copied
 end
 
-saveLocalFile("antartica_logs.txt", "=== Antartica Hub v4.4 Complete Edition Dijalankan ===", true)
+saveLocalFile("antartica_logs.txt", "=== Antartica Hub v4.5 Mountain Carver Edition Dijalankan ===", true)
 
 -- ===================================================================
 -- LOAD WINDUI LIBRARY
@@ -124,11 +125,19 @@ local State = {
     GodMode = true,
     AntiFallDamage = true,
     
-    -- Auto Dig & Mining
+    -- Auto Dig & Mountain Carver
     AutoDig = false,
+    AutoAdvanceMountain = true, -- Maju & Panjat gunung saat AFK dig
+    CarveSpeed = 0.45,
     PickaxePowerBoost = 5000,
     EnablePowerBoost = true,
     
+    -- Special Hacks & Remotes
+    JetpackThrust = false,
+    AutoPlasmaDrill = false,
+    AutoRadarPulse = false,
+    AutoUsePotions = false,
+
     -- Target Player
     SelectedPlayerName = nil,
     LoopFollowPlayer = false,
@@ -137,6 +146,7 @@ local State = {
     AutoMineMostExpensive = false,
     AutoMineGeneral = false,
     AutoPickupGem = true,
+    StrictPlotFilter = true, -- Filter kebun player strictly
     SelectedRarityFilter = "Semua (All)",
     CurrentBag = 0,
     MaxBagCapacity = 20,
@@ -169,20 +179,39 @@ local State = {
     }
 }
 
--- REMOTES REFERENCE DARI EVENT.TXT
+-- REMOTES REFERENCE DARI EVENT.TXT (103 REMOTES)
 local Remotes = {
-    DigRequest      = ReplicatedStorage:FindFirstChild("DigRemotes") and ReplicatedStorage.DigRemotes:FindFirstChild("DigRequest"),
-    SetDigPower     = ReplicatedStorage:FindFirstChild("DigRemotes") and ReplicatedStorage.DigRemotes:FindFirstChild("SetDigPower"),
-    PickupGem       = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("PickupGem"),
-    GemCollected    = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("GemCollected"),
-    MineHit         = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("MineHit"),
-    RequestSell     = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("RequestSell"),
-    OpenSellerMenu  = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("OpenSellerMenu"),
+    DigRequest        = ReplicatedStorage:FindFirstChild("DigRemotes") and ReplicatedStorage.DigRemotes:FindFirstChild("DigRequest"),
+    SetDigPower       = ReplicatedStorage:FindFirstChild("DigRemotes") and ReplicatedStorage.DigRemotes:FindFirstChild("SetDigPower"),
+    PickupGem         = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("PickupGem"),
+    GemCollected      = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("GemCollected"),
+    MineHit           = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("MineHit"),
+    SetLuck           = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("SetLuck"),
+    RequestSell       = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("RequestSell"),
+    OpenSellerMenu    = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("OpenSellerMenu"),
     RequestOpenSeller = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("RequestOpenSeller"),
-    OpenBombShop    = ReplicatedStorage:FindFirstChild("BombRemotes") and ReplicatedStorage.BombRemotes:FindFirstChild("OpenShop"),
-    OpenRadarShop   = ReplicatedStorage:FindFirstChild("RadarRemotes") and ReplicatedStorage.RadarRemotes:FindFirstChild("OpenShop"),
-    ShopState       = ReplicatedStorage:FindFirstChild("ShopRemotes") and ReplicatedStorage.ShopRemotes:FindFirstChild("ShopState"),
-    UpgradeState    = ReplicatedStorage:FindFirstChild("UpgradeRemotes") and ReplicatedStorage.UpgradeRemotes:FindFirstChild("UpgradeState"),
+    OpenBombShop      = ReplicatedStorage:FindFirstChild("BombRemotes") and ReplicatedStorage.BombRemotes:FindFirstChild("OpenShop"),
+    ExplodeBomb       = ReplicatedStorage:FindFirstChild("BombRemotes") and ReplicatedStorage.BombRemotes:FindFirstChild("Explode"),
+    BuyBomb           = ReplicatedStorage:FindFirstChild("BombRemotes") and ReplicatedStorage.BombRemotes:FindFirstChild("BuyBomb"),
+    OpenRadarShop     = ReplicatedStorage:FindFirstChild("RadarRemotes") and ReplicatedStorage.RadarRemotes:FindFirstChild("OpenShop"),
+    RadarUsed         = ReplicatedStorage:FindFirstChild("RadarRemotes") and ReplicatedStorage.RadarRemotes:FindFirstChild("RadarUsed"),
+    PowerFired        = ReplicatedStorage:FindFirstChild("RadarRemotes") and ReplicatedStorage.RadarRemotes:FindFirstChild("PowerFired"),
+    ShopState         = ReplicatedStorage:FindFirstChild("ShopRemotes") and ReplicatedStorage.ShopRemotes:FindFirstChild("ShopState"),
+    UpgradeState      = ReplicatedStorage:FindFirstChild("UpgradeRemotes") and ReplicatedStorage.UpgradeRemotes:FindFirstChild("UpgradeState"),
+    ThrustState       = ReplicatedStorage:FindFirstChild("JetpackSystem") and ReplicatedStorage.JetpackSystem:FindFirstChild("Remotes") and ReplicatedStorage.JetpackSystem.Remotes:FindFirstChild("ThrustState"),
+    DrillEvent        = ReplicatedStorage:FindFirstChild("DrillTools") and ReplicatedStorage.DrillTools:FindFirstChild("Plasma Drill") and ReplicatedStorage.DrillTools["Plasma Drill"]:FindFirstChild("DrillEvent"),
+    Starfall          = ReplicatedStorage:FindFirstChild("WeatherRemotes") and ReplicatedStorage.WeatherRemotes:FindFirstChild("Starfall"),
+    MeteorEvent       = ReplicatedStorage:FindFirstChild("MeteorRemotes") and ReplicatedStorage.MeteorRemotes:FindFirstChild("Event"),
+    MountainRegen     = ReplicatedStorage:FindFirstChild("MountainRemotes") and ReplicatedStorage.MountainRemotes:FindFirstChild("Regen"),
+    AdminControl      = ReplicatedStorage:FindFirstChild("MountainRemotes") and ReplicatedStorage.MountainRemotes:FindFirstChild("AdminControl"),
+    RedeemCode        = ReplicatedStorage:FindFirstChild("RedeemCode"),
+    UsePotion         = ReplicatedStorage:FindFirstChild("UsePotion"),
+    SyncAllPotions    = ReplicatedStorage:FindFirstChild("SyncAllPotions"),
+    PlaceRune         = ReplicatedStorage:FindFirstChild("RuneRemotes") and ReplicatedStorage.RuneRemotes:FindFirstChild("PlaceRune"),
+    DropRune          = ReplicatedStorage:FindFirstChild("RuneRemotes") and ReplicatedStorage.RuneRemotes:FindFirstChild("DropRune"),
+    BoulderBroken     = ReplicatedStorage:FindFirstChild("BoulderRemotes") and ReplicatedStorage.BoulderRemotes:FindFirstChild("Broken"),
+    GroupVerify       = ReplicatedStorage:FindFirstChild("GroupRewardRemotes") and ReplicatedStorage.GroupRewardRemotes:FindFirstChild("Verify"),
+    AdminAbuseTrigger = ReplicatedStorage:FindFirstChild("AdminAbuseRemotes") and ReplicatedStorage.AdminAbuseRemotes:FindFirstChild("Trigger"),
 }
 
 -- ===================================================================
@@ -296,7 +325,7 @@ local function detectActualBagCount()
 end
 
 -- ===================================================================
--- BOOST DAYA HANCUR PICKAXE & AUTO DIG
+-- BOOST DAYA HANCUR PICKAXE & MOUNTAIN ADVANCE ENGINE
 -- ===================================================================
 local function boostPickaxePower()
     if not State.EnablePowerBoost then return end
@@ -373,6 +402,36 @@ local function triggerDigAction()
                 if myPick then myPick.Parent = char end
             end
         end
+
+        -- LOGIC MAJU & PANJAT GUNUNG (CARVING TERRAIN FORWARD INTO MOUNTAIN)
+        if State.AutoAdvanceMountain and State.AutoDig then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hrp and hum then
+                -- Maju searah pandangan kamera/karakter menuju tebing
+                local lookDir = Camera.CFrame.LookVector
+                local flatDir = Vector3.new(lookDir.X, 0, lookDir.Z).Unit
+                if flatDir.Magnitude < 0.1 then flatDir = hrp.CFrame.LookVector end
+
+                -- Cek apakah ada dinding gunung di depan via Raycast
+                local rayOrigin = hrp.Position
+                local rayDirection = flatDir * 3.5
+                local raycastParams = RaycastParams.new()
+                raycastParams.FilterAncestorsInstances = { char }
+                raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+
+                local result = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+                local stepUp = 0.15
+                if result then
+                    -- Ada tebing/tanah gunung di depan! Panjat ke atas tebing sambil menghancurkan
+                    stepUp = 0.45
+                    hum.Jump = true
+                end
+
+                -- Geser posisi CFrame karakter maju ke dalam gunung
+                hrp.CFrame = hrp.CFrame + (flatDir * State.CarveSpeed) + Vector3.new(0, stepUp, 0)
+            end
+        end
     end
 
     if VirtualInputManager then
@@ -389,7 +448,7 @@ task.spawn(function()
     while true do
         if State.AutoDig then
             triggerDigAction()
-            task.wait(0.06)
+            task.wait(0.05)
         else
             task.wait(0.3)
         end
@@ -397,17 +456,33 @@ task.spawn(function()
 end)
 
 -- ===================================================================
--- PENCARIAN KRISTAL DENGAN FILTER KEBUN / PLOT PLAYER
+-- PENCARIAN KRISTAL DENGAN FILTER KEBUN / PLOT PLAYER STRICT
 -- ===================================================================
 local function isInsidePlot(obj)
+    if not State.StrictPlotFilter then return false end
     local current = obj
     while current and current ~= Workspace do
         local n = current.Name:lower()
-        if n:find("plot") or n:find("kebun") or n:find("garden") or n:find("farm") or n:find("base") or n:find("pajangan") then
+        if n:find("plot") or n:find("kebun") or n:find("garden") or n:find("farm") or n:find("base") or n:find("pajangan") or n:find("display") then
             return true
         end
         current = current.Parent
     end
+
+    -- Cek juga jarak ke Plot dasar jika ada folder Plot di Workspace
+    local pos = obj:IsA("Model") and obj:GetPivot().Position or (obj:IsA("BasePart") and obj.Position)
+    if pos then
+        local plotsFolder = Workspace:FindFirstChild("Plots") or Workspace:FindFirstChild("Bases")
+        if plotsFolder then
+            for _, plot in ipairs(plotsFolder:GetChildren()) do
+                local plotPos = plot:IsA("Model") and plot:GetPivot().Position or (plot:IsA("BasePart") and plot.Position)
+                if plotPos and (pos - plotPos).Magnitude < 35 then
+                    return true
+                end
+            end
+        end
+    end
+
     return false
 end
 
@@ -542,6 +617,25 @@ task.spawn(function()
 end)
 
 -- ===================================================================
+-- SPECIAL REMOTES LOOPS (Jetpack, Plasma Drill, Radar)
+-- ===================================================================
+task.spawn(function()
+    while true do
+        if State.JetpackThrust and Remotes.ThrustState then
+            pcall(function() Remotes.ThrustState:FireServer(true) end)
+        end
+        if State.AutoPlasmaDrill and Remotes.DrillEvent then
+            pcall(function() Remotes.DrillEvent:FireServer() end)
+        end
+        if State.AutoRadarPulse and Remotes.RadarUsed then
+            pcall(function() Remotes.RadarUsed:FireServer() end)
+            if Remotes.PowerFired then pcall(function() Remotes.PowerFired:FireServer() end) end
+        end
+        task.wait(0.15)
+    end
+end)
+
+-- ===================================================================
 -- DARAH PENUH & INFINITE JUMP
 -- ===================================================================
 local function applyHealthGuard(char)
@@ -583,7 +677,7 @@ RunService.Stepped:Connect(function()
         if State.GodMode and hum.Health < hum.MaxHealth and hum.Health > 0 then hum.Health = hum.MaxHealth end
     end
 
-    if State.Noclip and char then
+    if (State.Noclip or (State.AutoDig and State.AutoAdvanceMountain)) and char then
         for _, part in ipairs(char:GetDescendants()) do
             if part:IsA("BasePart") then part.CanCollide = false end
         end
@@ -591,7 +685,7 @@ RunService.Stepped:Connect(function()
 end)
 
 -- ===================================================================
--- FLY ENGINE
+-- FLY ENGINE & ERGONOMIC D-PAD CONTROLS
 -- ===================================================================
 local dpadParent = getSafeGuiParent()
 local oldDpad = dpadParent:FindFirstChild("AntarticaErgoControls")
@@ -760,14 +854,14 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 -- ===================================================================
--- MEMBUAT WINDOW DAN 7 TABS LENGKAP DENGAN WINDUI
+-- MEMBUAT WINDOW DAN 8 TABS LENGKAP DENGAN WINDUI
 -- ===================================================================
 local Window = WindUI:CreateWindow({
-    Title = "❄️ Antartica Mining Hub (v4.4)",
+    Title = "❄️ Antartica Mining Hub (v4.5)",
     Icon = "mountain",
     Author = "by Rhdevs",
     Folder = "AntarticaHub",
-    Size = UDim2.fromOffset(630, 490),
+    Size = UDim2.fromOffset(650, 510),
     Theme = "Dark",
 })
 
@@ -835,9 +929,24 @@ local AutoTab = Window:Tab({ Title = "Mining & Dig", Icon = "zap" })
 
 AutoTab:Toggle({
     Title = "⛏️ Auto Dig Continuous (Ketuk Gunung)",
-    Desc = "AFK Penggalian berulang di tebing gunung hingga lapisan tanah hancur",
+    Desc = "AFK Penggalian berulang di tebing gunung",
     Default = false,
     Callback = function(state) State.AutoDig = state end
+})
+
+AutoTab:Toggle({
+    Title = "🧗 Maju & Panjat Gunung Saat Dig (Terrain Carver)",
+    Desc = "Karakter otomatis MAJU & MANJAT tebing gunung saat dig, menghancurkan tanah step-by-step",
+    Default = true,
+    Callback = function(state) State.AutoAdvanceMountain = state end
+})
+
+AutoTab:Slider({
+    Title = "⚡ Kecepatan Maju Carve Gunung",
+    Desc = "Atur seberapa jauh langkah maju setiap kali ketukan dig",
+    Step = 0.05,
+    Value = { Min = 0.1, Max = 1.2, Default = 0.45 },
+    Callback = function(val) State.CarveSpeed = val end
 })
 
 AutoTab:Toggle({
@@ -878,7 +987,120 @@ AutoTab:Button({
     end
 })
 
--- TAB 3: TARGET PLAYER
+-- TAB 3: REMOTE HACKS & TOOLS (DAPATKAN FITUR REMOTES DARI EVENT.TXT)
+local RemoteTab = Window:Tab({ Title = "Remote Hacks", Icon = "cpu" })
+
+RemoteTab:Toggle({
+    Title = "🚀 Jetpack Thrust Auto Boost",
+    Desc = "Memicu JetpackSystem.Remotes.ThrustState untuk terbang jetpack terus menerus",
+    Default = false,
+    Callback = function(state) State.JetpackThrust = state end
+})
+
+RemoteTab:Toggle({
+    Title = "⚡ Auto Plasma Drill Beam",
+    Desc = "Memicu DrillTools.Plasma Drill.DrillEvent secara otomatis",
+    Default = false,
+    Callback = function(state) State.AutoPlasmaDrill = state end
+})
+
+RemoteTab:Toggle({
+    Title = "📡 Auto Mining Radar Pulse",
+    Desc = "Memicu RadarRemotes.RadarUsed & PowerFired untuk memindai ore",
+    Default = false,
+    Callback = function(state) State.AutoRadarPulse = state end
+})
+
+RemoteTab:Button({
+    Title = "💣 Meledakkan Bom (Bomb Explode)",
+    Desc = "Panggil BombRemotes.Explode:FireServer()",
+    Callback = function()
+        if Remotes.ExplodeBomb then
+            pcall(function() Remotes.ExplodeBomb:FireServer() end)
+            WindUI:Notify({ Title = "Remote Bom", Content = "Remote Bomb Explode dipicu!", Duration = 2 })
+        end
+    end
+})
+
+RemoteTab:Button({
+    Title = "🌟 Panggil Event Weather Starfall",
+    Desc = "Panggil WeatherRemotes.Starfall:FireServer()",
+    Callback = function()
+        if Remotes.Starfall then
+            pcall(function() Remotes.Starfall:FireServer() end)
+            WindUI:Notify({ Title = "Weather Event", Content = "Remote Weather Starfall dipicu!", Duration = 2 })
+        end
+    end
+})
+
+RemoteTab:Button({
+    Title = "☄️ Panggil Event Meteor Shower",
+    Desc = "Panggil MeteorRemotes.Event:FireServer()",
+    Callback = function()
+        if Remotes.MeteorEvent then
+            pcall(function() Remotes.MeteorEvent:FireServer() end)
+            WindUI:Notify({ Title = "Meteor Event", Content = "Remote Meteor Event dipicu!", Duration = 2 })
+        end
+    end
+})
+
+RemoteTab:Button({
+    Title = "🗻 Reset / Regen Gunung (Mountain Regen)",
+    Desc = "Panggil MountainRemotes.Regen:FireServer()",
+    Callback = function()
+        if Remotes.MountainRegen then
+            pcall(function() Remotes.MountainRegen:FireServer() end)
+            WindUI:Notify({ Title = "Mountain Regen", Content = "Remote Mountain Regen dipicu!", Duration = 2 })
+        end
+    end
+})
+
+RemoteTab:Button({
+    Title = "🍀 Set Super Luck (GemSignals.SetLuck)",
+    Desc = "Panggil GemSignals.SetLuck:FireServer(9999)",
+    Callback = function()
+        if Remotes.SetLuck then
+            pcall(function() Remotes.SetLuck:FireServer(9999) end)
+            WindUI:Notify({ Title = "Super Luck", Content = "Remote SetLuck (9999) dipicu!", Duration = 2 })
+        end
+    end
+})
+
+RemoteTab:Button({
+    Title = "🎁 Klaim Hadiah Grup (Group Reward Verify)",
+    Desc = "Panggil GroupRewardRemotes.Verify:FireServer()",
+    Callback = function()
+        if Remotes.GroupVerify then
+            pcall(function() Remotes.GroupVerify:FireServer() end)
+            WindUI:Notify({ Title = "Group Reward", Content = "Remote Group Reward Verify dipicu!", Duration = 2 })
+        end
+    end
+})
+
+RemoteTab:Button({
+    Title = "⚡ Admin Abuse Trigger",
+    Desc = "Panggil AdminAbuseRemotes.Trigger:FireServer()",
+    Callback = function()
+        if Remotes.AdminAbuseTrigger then
+            pcall(function() Remotes.AdminAbuseTrigger:FireServer() end)
+            WindUI:Notify({ Title = "Admin Abuse", Content = "Remote AdminAbuse Trigger dipicu!", Duration = 2 })
+        end
+    end
+})
+
+RemoteTab:Input({
+    Title = "🎟️ Redeem Promo Code",
+    Desc = "Masukkan kode redeem lalu tekan Enter",
+    Placeholder = "Ketik kode di sini...",
+    Callback = function(code)
+        if code and code ~= "" and Remotes.RedeemCode then
+            pcall(function() Remotes.RedeemCode:FireServer(code) end)
+            WindUI:Notify({ Title = "Redeem Code", Content = "Mencoba redeem kode: " .. code, Duration = 3 })
+        end
+    end
+})
+
+-- TAB 4: TARGET PLAYER
 local PlayerTab = Window:Tab({ Title = "Target Player", Icon = "user" })
 
 local playerDropdown = PlayerTab:Dropdown({
@@ -920,14 +1142,21 @@ PlayerTab:Toggle({
     Callback = function(state) State.LoopFollowPlayer = state end
 })
 
--- TAB 4: BAG & CRYSTALS
+-- TAB 5: BAG & CRYSTALS
 local BagTab = Window:Tab({ Title = "Bag & Crystals", Icon = "gem" })
 
 BagTab:Toggle({
-    Title = "💎 Auto Mine Kristal Termahal (Filter Plot)",
-    Desc = "Mencari & TP ke kristal termahal di gunung (Mengabaikan Kebun/Plot Player)",
+    Title = "💎 Auto Mine Kristal Termahal (Liar)",
+    Desc = "Mencari & TP ke kristal termahal liar di gunung",
     Default = false,
     Callback = function(state) State.AutoMineMostExpensive = state end
+})
+
+BagTab:Toggle({
+    Title = "🛡️ Filter Strict Plot Kebun Player",
+    Desc = "Mengabaikan kristal di dalam area plot/kebun milik pemain lain",
+    Default = true,
+    Callback = function(state) State.StrictPlotFilter = state end
 })
 
 BagTab:Toggle({
@@ -970,7 +1199,7 @@ BagTab:Button({
     end
 })
 
--- TAB 5: TELEPORTS & SHOPS
+-- TAB 6: TELEPORTS & SHOPS
 local TpTab = Window:Tab({ Title = "Teleports & Shops", Icon = "map-pin" })
 
 TpTab:Button({
@@ -1051,7 +1280,7 @@ TpTab:Button({
     end
 })
 
--- TAB 6: MAP INSPECTOR
+-- TAB 7: MAP INSPECTOR
 local MapTab = Window:Tab({ Title = "Map Inspector", Icon = "sun" })
 
 MapTab:Slider({
@@ -1087,7 +1316,7 @@ MapTab:Toggle({
     Callback = function(state) State.InfiniteJump = state end
 })
 
--- TAB 7: DEV SCANNER & REMOTES
+-- TAB 8: DEV SCANNER & REMOTES
 local DevTab = Window:Tab({ Title = "Dev Scanner", Icon = "code" })
 
 DevTab:Button({
@@ -1130,9 +1359,9 @@ DevTab:Button({
     end
 })
 
-print("❄️ Antartica Mining Hub (v4.4 Complete Edition) Berhasil Dimuat!")
+print("❄️ Antartica Mining Hub (v4.5 Mountain Carver & Remote Hacks) Berhasil Dimuat!")
 WindUI:Notify({
-    Title = "❄️ Antartica Hub v4.4 Active",
-    Content = "7 Tab WindUI Lengkap (Movement, Mining, Target, Bag, TP, Inspector, Dev) Ready!",
+    Title = "❄️ Antartica Hub v4.5 Active",
+    Content = "8 Tab WindUI Lengkap + Mountain Carver + 103 Remotes Hacks Ready!",
     Duration = 4
 })
