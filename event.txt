@@ -1,0 +1,419 @@
+=======================================================
+🔍 DAFTAR LENGKAP SEMUA REMOTE EVENT & FUNCTION DI GAME
+Game PlaceId: 138686218420016
+Waktu Scan  : 2026-09-23 17:41:36
+=======================================================
+
+[001] [RemoteEvent] BestChanged
+      Path: ReplicatedStorage.AltitudeRemotes.BestChanged
+      Panggil: ReplicatedStorage.AltitudeRemotes.BestChanged:FireServer(...)
+
+[002] [RemoteEvent] DigRequest
+      Path: ReplicatedStorage.DigRemotes.DigRequest
+      Panggil: ReplicatedStorage.DigRemotes.DigRequest:FireServer(...)
+
+[003] [RemoteEvent] DigResult
+      Path: ReplicatedStorage.DigRemotes.DigResult
+      Panggil: ReplicatedStorage.DigRemotes.DigResult:FireServer(...)
+
+[004] [RemoteEvent] DigEffect
+      Path: ReplicatedStorage.DigRemotes.DigEffect
+      Panggil: ReplicatedStorage.DigRemotes.DigEffect:FireServer(...)
+
+[005] [RemoteEvent] SetDigPower
+      Path: ReplicatedStorage.DigRemotes.SetDigPower
+      Panggil: ReplicatedStorage.DigRemotes.SetDigPower:FireServer(...)
+
+[006] [RemoteEvent] TeleportHome
+      Path: ReplicatedStorage.BaseRemotes.TeleportHome
+      Panggil: ReplicatedStorage.BaseRemotes.TeleportHome:FireServer(...)
+
+[007] [RemoteEvent] FreezeSync
+      Path: ReplicatedStorage.FreezeRemotes.FreezeSync
+      Panggil: ReplicatedStorage.FreezeRemotes.FreezeSync:FireServer(...)
+
+[008] [RemoteEvent] BuyPickaxe
+      Path: ReplicatedStorage.ShopRemotes.BuyPickaxe
+      Panggil: ReplicatedStorage.ShopRemotes.BuyPickaxe:FireServer(...)
+
+[009] [RemoteEvent] EquipPickaxe
+      Path: ReplicatedStorage.ShopRemotes.EquipPickaxe
+      Panggil: ReplicatedStorage.ShopRemotes.EquipPickaxe:FireServer(...)
+
+[010] [RemoteEvent] ShopState
+      Path: ReplicatedStorage.ShopRemotes.ShopState
+      Panggil: ReplicatedStorage.ShopRemotes.ShopState:FireServer(...)
+
+[011] [RemoteEvent] BuyUpgrade
+      Path: ReplicatedStorage.UpgradeRemotes.BuyUpgrade
+      Panggil: ReplicatedStorage.UpgradeRemotes.BuyUpgrade:FireServer(...)
+
+[012] [RemoteEvent] UpgradeState
+      Path: ReplicatedStorage.UpgradeRemotes.UpgradeState
+      Panggil: ReplicatedStorage.UpgradeRemotes.UpgradeState:FireServer(...)
+
+[013] [RemoteEvent] BuyBomb
+      Path: ReplicatedStorage.BombRemotes.BuyBomb
+      Panggil: ReplicatedStorage.BombRemotes.BuyBomb:FireServer(...)
+
+[014] [RemoteEvent] ShopState
+      Path: ReplicatedStorage.BombRemotes.ShopState
+      Panggil: ReplicatedStorage.BombRemotes.ShopState:FireServer(...)
+
+[015] [RemoteEvent] OpenShop
+      Path: ReplicatedStorage.BombRemotes.OpenShop
+      Panggil: ReplicatedStorage.BombRemotes.OpenShop:FireServer(...)
+
+[016] [RemoteEvent] Explode
+      Path: ReplicatedStorage.BombRemotes.Explode
+      Panggil: ReplicatedStorage.BombRemotes.Explode:FireServer(...)
+
+[017] [RemoteEvent] GemFreed
+      Path: ReplicatedStorage.GemSignals.GemFreed
+      Panggil: ReplicatedStorage.GemSignals.GemFreed:FireServer(...)
+
+[018] [RemoteEvent] PickupGem
+      Path: ReplicatedStorage.GemSignals.PickupGem
+      Panggil: ReplicatedStorage.GemSignals.PickupGem:FireServer(...)
+
+[019] [RemoteEvent] MineHit
+      Path: ReplicatedStorage.GemSignals.MineHit
+      Panggil: ReplicatedStorage.GemSignals.MineHit:FireServer(...)
+
+[020] [RemoteEvent] GemCollected
+      Path: ReplicatedStorage.GemSignals.GemCollected
+      Panggil: ReplicatedStorage.GemSignals.GemCollected:FireServer(...)
+
+[021] [RemoteEvent] DropCrystal
+      Path: ReplicatedStorage.GemSignals.DropCrystal
+      Panggil: ReplicatedStorage.GemSignals.DropCrystal:FireServer(...)
+
+[022] [RemoteEvent] SetLuck
+      Path: ReplicatedStorage.GemSignals.SetLuck
+      Panggil: ReplicatedStorage.GemSignals.SetLuck:FireServer(...)
+
+[023] [RemoteEvent] AdminControl
+      Path: ReplicatedStorage.MountainRemotes.AdminControl
+      Panggil: ReplicatedStorage.MountainRemotes.AdminControl:FireServer(...)
+
+[024] [RemoteEvent] Changed
+      Path: ReplicatedStorage.MountainRemotes.Changed
+      Panggil: ReplicatedStorage.MountainRemotes.Changed:FireServer(...)
+
+[025] [RemoteEvent] Regen
+      Path: ReplicatedStorage.MountainRemotes.Regen
+      Panggil: ReplicatedStorage.MountainRemotes.Regen:FireServer(...)
+
+[026] [RemoteEvent] Play
+      Path: ReplicatedStorage.PurchaseRemotes.Play
+      Panggil: ReplicatedStorage.PurchaseRemotes.Play:FireServer(...)
+
+[027] [RemoteEvent] DrillEvent
+      Path: ReplicatedStorage.DrillTools.Plasma Drill.DrillEvent
+      Panggil: ReplicatedStorage.DrillTools.Plasma Drill.DrillEvent:FireServer(...)
+
+[028] [RemoteEvent] ThrustState
+      Path: ReplicatedStorage.JetpackSystem.Remotes.ThrustState
+      Panggil: ReplicatedStorage.JetpackSystem.Remotes.ThrustState:FireServer(...)
+
+[029] [RemoteEvent] BuyRadar
+      Path: ReplicatedStorage.RadarRemotes.BuyRadar
+      Panggil: ReplicatedStorage.RadarRemotes.BuyRadar:FireServer(...)
+
+[030] [RemoteEvent] ShopState
+      Path: ReplicatedStorage.RadarRemotes.ShopState
+      Panggil: ReplicatedStorage.RadarRemotes.ShopState:FireServer(...)
+
+[031] [RemoteEvent] OpenShop
+      Path: ReplicatedStorage.RadarRemotes.OpenShop
+      Panggil: ReplicatedStorage.RadarRemotes.OpenShop:FireServer(...)
+
+[032] [RemoteEvent] RadarUsed
+      Path: ReplicatedStorage.RadarRemotes.RadarUsed
+      Panggil: ReplicatedStorage.RadarRemotes.RadarUsed:FireServer(...)
+
+[033] [RemoteEvent] PowerFired
+      Path: ReplicatedStorage.RadarRemotes.PowerFired
+      Panggil: ReplicatedStorage.RadarRemotes.PowerFired:FireServer(...)
+
+[034] [RemoteFunction] GetSettings
+      Path: ReplicatedStorage.SettingsRemotes.GetSettings
+      Invoke : ReplicatedStorage.SettingsRemotes.GetSettings:InvokeServer(...)
+
+[035] [RemoteEvent] SaveSettings
+      Path: ReplicatedStorage.SettingsRemotes.SaveSettings
+      Panggil: ReplicatedStorage.SettingsRemotes.SaveSettings:FireServer(...)
+
+[036] [RemoteEvent] SetAccessories
+      Path: ReplicatedStorage.SettingsRemotes.SetAccessories
+      Panggil: ReplicatedStorage.SettingsRemotes.SetAccessories:FireServer(...)
+
+[037] [RemoteEvent] Push
+      Path: ReplicatedStorage.NotifyRemotes.Push
+      Panggil: ReplicatedStorage.NotifyRemotes.Push:FireServer(...)
+
+[038] [RemoteEvent] OpenSellerMenu
+      Path: ReplicatedStorage.GemRemotes.OpenSellerMenu
+      Panggil: ReplicatedStorage.GemRemotes.OpenSellerMenu:FireServer(...)
+
+[039] [RemoteEvent] RequestOpenSeller
+      Path: ReplicatedStorage.GemRemotes.RequestOpenSeller
+      Panggil: ReplicatedStorage.GemRemotes.RequestOpenSeller:FireServer(...)
+
+[040] [RemoteEvent] RequestSell
+      Path: ReplicatedStorage.GemRemotes.RequestSell
+      Panggil: ReplicatedStorage.GemRemotes.RequestSell:FireServer(...)
+
+[041] [RemoteEvent] RequestWorth
+      Path: ReplicatedStorage.GemRemotes.RequestWorth
+      Panggil: ReplicatedStorage.GemRemotes.RequestWorth:FireServer(...)
+
+[042] [RemoteEvent] ReceiveWorth
+      Path: ReplicatedStorage.GemRemotes.ReceiveWorth
+      Panggil: ReplicatedStorage.GemRemotes.ReceiveWorth:FireServer(...)
+
+[043] [RemoteEvent] InventoryChanged
+      Path: ReplicatedStorage.GemRemotes.InventoryChanged
+      Panggil: ReplicatedStorage.GemRemotes.InventoryChanged:FireServer(...)
+
+[044] [RemoteEvent] SellResult
+      Path: ReplicatedStorage.GemRemotes.SellResult
+      Panggil: ReplicatedStorage.GemRemotes.SellResult:FireServer(...)
+
+[045] [RemoteEvent] ToggleFavorite
+      Path: ReplicatedStorage.GemRemotes.ToggleFavorite
+      Panggil: ReplicatedStorage.GemRemotes.ToggleFavorite:FireServer(...)
+
+[046] [RemoteEvent] CoinsGained
+      Path: ReplicatedStorage.GemRemotes.CoinsGained
+      Panggil: ReplicatedStorage.GemRemotes.CoinsGained:FireServer(...)
+
+[047] [RemoteEvent] PlaceCrystal
+      Path: ReplicatedStorage.PlotRemotes.PlaceCrystal
+      Panggil: ReplicatedStorage.PlotRemotes.PlaceCrystal:FireServer(...)
+
+[048] [RemoteEvent] TakeCrystal
+      Path: ReplicatedStorage.PlotRemotes.TakeCrystal
+      Panggil: ReplicatedStorage.PlotRemotes.TakeCrystal:FireServer(...)
+
+[049] [RemoteEvent] BuyCapacity
+      Path: ReplicatedStorage.PlotRemotes.BuyCapacity
+      Panggil: ReplicatedStorage.PlotRemotes.BuyCapacity:FireServer(...)
+
+[050] [RemoteEvent] PlotState
+      Path: ReplicatedStorage.PlotRemotes.PlotState
+      Panggil: ReplicatedStorage.PlotRemotes.PlotState:FireServer(...)
+
+[051] [RemoteEvent] PlotMessage
+      Path: ReplicatedStorage.PlotRemotes.PlotMessage
+      Panggil: ReplicatedStorage.PlotRemotes.PlotMessage:FireServer(...)
+
+[052] [RemoteFunction] ConfigStats
+      Path: ReplicatedStorage.PlotRemotes.ConfigStats
+      Invoke : ReplicatedStorage.PlotRemotes.ConfigStats:InvokeServer(...)
+
+[053] [RemoteFunction] ConfigGet
+      Path: ReplicatedStorage.PlotRemotes.ConfigGet
+      Invoke : ReplicatedStorage.PlotRemotes.ConfigGet:InvokeServer(...)
+
+[054] [RemoteEvent] ConfigMutation
+      Path: ReplicatedStorage.PlotRemotes.ConfigMutation
+      Panggil: ReplicatedStorage.PlotRemotes.ConfigMutation:FireServer(...)
+
+[055] [RemoteEvent] ConfigCollision
+      Path: ReplicatedStorage.PlotRemotes.ConfigCollision
+      Panggil: ReplicatedStorage.PlotRemotes.ConfigCollision:FireServer(...)
+
+[056] [RemoteEvent] TakeOut
+      Path: ReplicatedStorage.PlotRemotes.TakeOut
+      Panggil: ReplicatedStorage.PlotRemotes.TakeOut:FireServer(...)
+
+[057] [RemoteEvent] Populate
+      Path: ReplicatedStorage.PlotRemotes.Populate
+      Panggil: ReplicatedStorage.PlotRemotes.Populate:FireServer(...)
+
+[058] [RemoteEvent] ConfigChanged
+      Path: ReplicatedStorage.PlotRemotes.ConfigChanged
+      Panggil: ReplicatedStorage.PlotRemotes.ConfigChanged:FireServer(...)
+
+[059] [RemoteEvent] ShowFull
+      Path: ReplicatedStorage.BackpackRemotes.ShowFull
+      Panggil: ReplicatedStorage.BackpackRemotes.ShowFull:FireServer(...)
+
+[060] [RemoteEvent] TeleportSell
+      Path: ReplicatedStorage.BackpackRemotes.TeleportSell
+      Panggil: ReplicatedStorage.BackpackRemotes.TeleportSell:FireServer(...)
+
+[061] [RemoteEvent] TeleportPlot
+      Path: ReplicatedStorage.BackpackRemotes.TeleportPlot
+      Panggil: ReplicatedStorage.BackpackRemotes.TeleportPlot:FireServer(...)
+
+[062] [RemoteEvent] Sync
+      Path: ReplicatedStorage.IndexRemotes.Sync
+      Panggil: ReplicatedStorage.IndexRemotes.Sync:FireServer(...)
+
+[063] [RemoteEvent] Add
+      Path: ReplicatedStorage.IndexRemotes.Add
+      Panggil: ReplicatedStorage.IndexRemotes.Add:FireServer(...)
+
+[064] [RemoteEvent] Request
+      Path: ReplicatedStorage.IndexRemotes.Request
+      Panggil: ReplicatedStorage.IndexRemotes.Request:FireServer(...)
+
+[065] [RemoteEvent] Changed
+      Path: ReplicatedStorage.WeatherRemotes.Changed
+      Panggil: ReplicatedStorage.WeatherRemotes.Changed:FireServer(...)
+
+[066] [RemoteEvent] AdminControl
+      Path: ReplicatedStorage.WeatherRemotes.AdminControl
+      Panggil: ReplicatedStorage.WeatherRemotes.AdminControl:FireServer(...)
+
+[067] [RemoteEvent] Starfall
+      Path: ReplicatedStorage.WeatherRemotes.Starfall
+      Panggil: ReplicatedStorage.WeatherRemotes.Starfall:FireServer(...)
+
+[068] [RemoteEvent] Trigger
+      Path: ReplicatedStorage.AdminAbuseRemotes.Trigger
+      Panggil: ReplicatedStorage.AdminAbuseRemotes.Trigger:FireServer(...)
+
+[069] [RemoteEvent] Started
+      Path: ReplicatedStorage.AdminAbuseRemotes.Started
+      Panggil: ReplicatedStorage.AdminAbuseRemotes.Started:FireServer(...)
+
+[070] [RemoteEvent] GlobalAnnouncementEvent
+      Path: ReplicatedStorage.GlobalAnnouncementEvent
+      Panggil: ReplicatedStorage.GlobalAnnouncementEvent:FireServer(...)
+
+[071] [RemoteEvent] ShutdownCountdownEvent
+      Path: ReplicatedStorage.ShutdownCountdownEvent
+      Panggil: ReplicatedStorage.ShutdownCountdownEvent:FireServer(...)
+
+[072] [RemoteEvent] Announce
+      Path: ReplicatedStorage.AdminRemotes.Announce
+      Panggil: ReplicatedStorage.AdminRemotes.Announce:FireServer(...)
+
+[073] [RemoteEvent] PlayerCommand
+      Path: ReplicatedStorage.AdminRemotes.PlayerCommand
+      Panggil: ReplicatedStorage.AdminRemotes.PlayerCommand:FireServer(...)
+
+[074] [RemoteEvent] GiveCrystal
+      Path: ReplicatedStorage.AdminRemotes.GiveCrystal
+      Panggil: ReplicatedStorage.AdminRemotes.GiveCrystal:FireServer(...)
+
+[075] [RemoteEvent] GiveBomb
+      Path: ReplicatedStorage.AdminRemotes.GiveBomb
+      Panggil: ReplicatedStorage.AdminRemotes.GiveBomb:FireServer(...)
+
+[076] [RemoteEvent] GlobalBombRestock
+      Path: ReplicatedStorage.AdminRemotes.GlobalBombRestock
+      Panggil: ReplicatedStorage.AdminRemotes.GlobalBombRestock:FireServer(...)
+
+[077] [RemoteEvent] ReleaseContent
+      Path: ReplicatedStorage.AdminRemotes.ReleaseContent
+      Panggil: ReplicatedStorage.AdminRemotes.ReleaseContent:FireServer(...)
+
+[078] [RemoteEvent] ReleaseCrystals
+      Path: ReplicatedStorage.AdminRemotes.ReleaseCrystals
+      Panggil: ReplicatedStorage.AdminRemotes.ReleaseCrystals:FireServer(...)
+
+[079] [RemoteEvent] ReleaseNewMountains
+      Path: ReplicatedStorage.AdminRemotes.ReleaseNewMountains
+      Panggil: ReplicatedStorage.AdminRemotes.ReleaseNewMountains:FireServer(...)
+
+[080] [RemoteEvent] ReleaseJetpack
+      Path: ReplicatedStorage.AdminRemotes.ReleaseJetpack
+      Panggil: ReplicatedStorage.AdminRemotes.ReleaseJetpack:FireServer(...)
+
+[081] [RemoteEvent] RuneAdmin
+      Path: ReplicatedStorage.AdminRemotes.RuneAdmin
+      Panggil: ReplicatedStorage.AdminRemotes.RuneAdmin:FireServer(...)
+
+[082] [RemoteEvent] AntiIdleRejoin
+      Path: ReplicatedStorage.AntiIdleRejoin
+      Panggil: ReplicatedStorage.AntiIdleRejoin:FireServer(...)
+
+[083] [RemoteEvent] Event
+      Path: ReplicatedStorage.MeteorRemotes.Event
+      Panggil: ReplicatedStorage.MeteorRemotes.Event:FireServer(...)
+
+[084] [RemoteEvent] AdminControl
+      Path: ReplicatedStorage.MeteorRemotes.AdminControl
+      Panggil: ReplicatedStorage.MeteorRemotes.AdminControl:FireServer(...)
+
+[085] [RemoteEvent] Verify
+      Path: ReplicatedStorage.GroupRewardRemotes.Verify
+      Panggil: ReplicatedStorage.GroupRewardRemotes.Verify:FireServer(...)
+
+[086] [RemoteEvent] PromptJoin
+      Path: ReplicatedStorage.GroupRewardRemotes.PromptJoin
+      Panggil: ReplicatedStorage.GroupRewardRemotes.PromptJoin:FireServer(...)
+
+[087] [RemoteFunction] SelectRecipient
+      Path: ReplicatedStorage.GiftRemotes.SelectRecipient
+      Invoke : ReplicatedStorage.GiftRemotes.SelectRecipient:InvokeServer(...)
+
+[088] [RemoteFunction] ListPlayers
+      Path: ReplicatedStorage.GiftRemotes.ListPlayers
+      Invoke : ReplicatedStorage.GiftRemotes.ListPlayers:InvokeServer(...)
+
+[089] [RemoteEvent] UsePotion
+      Path: ReplicatedStorage.UsePotion
+      Panggil: ReplicatedStorage.UsePotion:FireServer(...)
+
+[090] [RemoteEvent] UpdatePotions
+      Path: ReplicatedStorage.UpdatePotions
+      Panggil: ReplicatedStorage.UpdatePotions:FireServer(...)
+
+[091] [RemoteEvent] SyncAllPotions
+      Path: ReplicatedStorage.SyncAllPotions
+      Panggil: ReplicatedStorage.SyncAllPotions:FireServer(...)
+
+[092] [RemoteFunction] GetPotions
+      Path: ReplicatedStorage.GetPotions
+      Invoke : ReplicatedStorage.GetPotions:InvokeServer(...)
+
+[093] [RemoteEvent] ShowTutorial
+      Path: ReplicatedStorage.ClientFlagsRemotes.ShowTutorial
+      Panggil: ReplicatedStorage.ClientFlagsRemotes.ShowTutorial:FireServer(...)
+
+[094] [RemoteEvent] ShowLuckTip
+      Path: ReplicatedStorage.ClientFlagsRemotes.ShowLuckTip
+      Panggil: ReplicatedStorage.ClientFlagsRemotes.ShowLuckTip:FireServer(...)
+
+[095] [RemoteEvent] GlobalFindFeed
+      Path: ReplicatedStorage.GlobalFindFeed
+      Panggil: ReplicatedStorage.GlobalFindFeed:FireServer(...)
+
+[096] [RemoteEvent] GiveCoins
+      Path: ReplicatedStorage.GiveCoins
+      Panggil: ReplicatedStorage.GiveCoins:FireServer(...)
+
+[097] [RemoteEvent] RedeemCode
+      Path: ReplicatedStorage.RedeemCode
+      Panggil: ReplicatedStorage.RedeemCode:FireServer(...)
+
+[098] [RemoteFunction] AdminGrant
+      Path: ReplicatedStorage.AdminGrant
+      Invoke : ReplicatedStorage.AdminGrant:InvokeServer(...)
+
+[099] [RemoteEvent] PlaceRune
+      Path: ReplicatedStorage.RuneRemotes.PlaceRune
+      Panggil: ReplicatedStorage.RuneRemotes.PlaceRune:FireServer(...)
+
+[100] [RemoteEvent] DropRune
+      Path: ReplicatedStorage.RuneRemotes.DropRune
+      Panggil: ReplicatedStorage.RuneRemotes.DropRune:FireServer(...)
+
+[101] [RemoteEvent] Broken
+      Path: ReplicatedStorage.BoulderRemotes.Broken
+      Panggil: ReplicatedStorage.BoulderRemotes.Broken:FireServer(...)
+
+[102] [RemoteEvent] UpdateAttachments
+      Path: Workspace.FollowMouse.UpdateAttachments
+      Panggil: Workspace.FollowMouse.UpdateAttachments:FireServer(...)
+
+[103] [RemoteEvent] BestChanged
+      Path: Workspace.AltitudeRemotes.BestChanged
+      Panggil: Workspace.AltitudeRemotes.BestChanged:FireServer(...)
+
+✅ Selesai: Total 103 Remote ditemukan!
