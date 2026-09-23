@@ -1,16 +1,16 @@
 --[[
     ===================================================================
-    ❄️ ANTARTICA HUB - MOUNTAIN MINING & UTILITY (v4.2 Ultimate Edition)
+    ❄️ ANTARTICA HUB - MOUNTAIN MINING & UTILITY (v4.3 Fix Edition)
     ===================================================================
     UI Library: WindUI (https://github.com/Footagesus/WindUI)
     Dibuat untuk: Owner Game & Map Tester (Roblox Mountain Mining)
     
-    Fitur Baru (v4.2):
-      • 🎒 Fitur Gendong / Carry Player (Menempelkan player target agar terbawa berjalan/terbang)
-      • ⛏️ Pickaxe Power Boost Terukur (Nilai default disesuaikan ke 5.000 + Slider Kustom)
-      • 🛑 Filter Kebun / Plot (Mengabaikan kristal milik player lain di plot/kebun)
-      • 🛍️ Remote Buka UI Toko (Trigger UI Toko Jual, Bom, Radar, & Upgrade)
-      • 🏔️ AFK Mountain Continuous Dig (Mengetuk tebing gunung berulang hingga kristal terbebas)
+    Perbaikan & Pembaruan (v4.3):
+      • ❌ Dihapus: Fitur Gendong (FE Non-Replicated) agar aman dari POV Dev/Server.
+      • 🛍️ Perbaikan Buka Toko (Direct PlayerGui & ProximityPrompt NPC Trigger).
+      • ⛏️ Pickaxe Power Boost Terukur (Default 5.000 + Slider Custom).
+      • 🛑 Filter Kebun / Plot (Mengabaikan kristal di plot/kebun milik player lain).
+      • 🏔️ AFK Mountain Continuous Dig (Menggali gunung berulang hingga kristal lepas).
     ===================================================================
 ]]
 
@@ -27,7 +27,7 @@ local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local Camera = Workspace.CurrentCamera
 
--- VIRTUAL INPUT (Untuk Executor)
+-- VIRTUAL INPUT
 local VirtualInputManager = nil
 pcall(function() VirtualInputManager = game:GetService("VirtualInputManager") end)
 
@@ -43,66 +43,6 @@ local function getSafeGuiParent()
         if ok then return cg end
     end
     return LocalPlayer:WaitForChild("PlayerGui")
-end
-
--- ===================================================================
--- SISTEM LOGGING FILE LOKAL HP & CLIPBOARD
--- ===================================================================
-local function saveLocalFile(fileName, content, isAppend)
-    local timestamp = os.date("%Y-%m-%d %H:%M:%S")
-    local formatted = string.format("[%s] %s\n", timestamp, content)
-    pcall(function()
-        if isAppend and type(appendfile) == "function" then
-            appendfile(fileName, formatted)
-        elseif type(writefile) == "function" then
-            local prev = ""
-            if isAppend and type(isfile) == "function" and isfile(fileName) and type(readfile) == "function" then
-                prev = readfile(fileName)
-            end
-            writefile(fileName, prev .. formatted)
-        end
-    end)
-end
-
-local function copyToRealClipboard(text)
-    local copied = false
-    if type(setclipboard) == "function" then
-        local ok = pcall(function() setclipboard(text) end)
-        if ok then copied = true end
-    end
-    if not copied and type(toclipboard) == "function" then
-        local ok = pcall(function() toclipboard(text) end)
-        if ok then copied = true end
-    end
-    saveLocalFile("antartica_logs.txt", "Teks disalin ke clipboard (" .. #text .. " karakter)", true)
-    return copied
-end
-
-saveLocalFile("antartica_logs.txt", "=== Antartica Hub v4.2 Ultimate Edition Dijalankan ===", true)
-
--- ===================================================================
--- LOAD WINDUI LIBRARY
--- ===================================================================
-local WindUI = nil
-local loadUrls = {
-    "https://raw.githubusercontent.com/Footagesus/WindUI/refs/heads/main/dist/main.lua",
-    "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua",
-    "https://tree-hub.vercel.app/api/library/windui"
-}
-
-for _, url in ipairs(loadUrls) do
-    local ok, res = pcall(function()
-        return loadstring(game:HttpGet(url))()
-    end)
-    if ok and res then
-        WindUI = res
-        break
-    end
-end
-
-if not WindUI then
-    warn("❌ Gagal memuat WindUI dari internet! Pastikan koneksi executor aktif.")
-    return
 end
 
 -- ===================================================================
@@ -124,13 +64,12 @@ local State = {
     
     -- Auto Dig & Mining
     AutoDig = false,
-    PickaxePowerBoost = 5000, -- Dikecilkan dari 100k sesuai permintaan
+    PickaxePowerBoost = 5000,
     EnablePowerBoost = true,
     
-    -- Target Player & Carry (Gendong)
+    -- Target Player
     SelectedPlayerName = nil,
     LoopFollowPlayer = false,
-    CarryPlayer = false,
 
     -- Auto Mine & Gem Magnet
     AutoMineMostExpensive = false,
@@ -142,7 +81,7 @@ local State = {
     AutoReturnWhenFull = true,
     IsReturning = false,
     
-    -- Waypoints Toko Asli (Sesuai Data Koordinat Anda)
+    -- Waypoints Toko Asli
     Waypoints = {
         ["🏪 Toko Jual (Sell)"]     = CFrame.new(433.42, 65.16, -844.76),
         ["💣 Toko Bom (Bomb)"]       = CFrame.new(369.68, 65.17, -840.77),
@@ -151,52 +90,93 @@ local State = {
         ["📡 Toko Radars"]           = CFrame.new(370.82, 65.17, -789.87),
         ["🏔️ Puncak Gunung (Peak)"]  = CFrame.new(220.00, 330.00, 480.00),
     },
-    CustomWaypoints = {},
     LastMiningPosition = nil,
     
-    -- ESP & Lighting
-    CrystalESP = false,
-    PlayerESP = false,
+    -- Lighting
     Fullbright = false,
     NoFog = false,
     TimeOfDay = 14,
 
     RarityConfig = {
-        ["Mythic"]    = { Price = 1500, Priority = 6, Color = Color3.fromRGB(255, 50, 50) },
-        ["Legendary"] = { Price = 500,  Priority = 5, Color = Color3.fromRGB(255, 170, 0) },
-        ["Epic"]      = { Price = 180,  Priority = 4, Color = Color3.fromRGB(170, 0, 255) },
-        ["Rare"]      = { Price = 65,   Priority = 3, Color = Color3.fromRGB(0, 150, 255) },
-        ["Uncommon"]  = { Price = 25,   Priority = 2, Color = Color3.fromRGB(0, 255, 100) },
-        ["Common"]    = { Price = 10,   Priority = 1, Color = Color3.fromRGB(200, 200, 200) },
+        ["Mythic"]    = { Price = 1500, Priority = 6 },
+        ["Legendary"] = { Price = 500,  Priority = 5 },
+        ["Epic"]      = { Price = 180,  Priority = 4 },
+        ["Rare"]      = { Price = 65,   Priority = 3 },
+        ["Uncommon"]  = { Price = 25,   Priority = 2 },
+        ["Common"]    = { Price = 10,   Priority = 1 },
     }
 }
 
--- ===================================================================
--- REMOTES REFERENCE DARI EVENT.TXT (UI TOKO & GRINDING)
--- ===================================================================
+-- REMOTES REFERENCE
 local Remotes = {
-    -- Dig & Power
-    DigRequest      = ReplicatedStorage:FindFirstChild("DigRemotes") and ReplicatedStorage.DigRemotes:FindFirstChild("DigRequest"),
-    SetDigPower     = ReplicatedStorage:FindFirstChild("DigRemotes") and ReplicatedStorage.DigRemotes:FindFirstChild("SetDigPower"),
-    
-    -- Gems & Selling
-    PickupGem       = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("PickupGem"),
-    GemCollected    = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("GemCollected"),
-    MineHit         = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("MineHit"),
-    RequestSell     = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("RequestSell"),
-    TeleportSell    = ReplicatedStorage:FindFirstChild("BackpackRemotes") and ReplicatedStorage.BackpackRemotes:FindFirstChild("TeleportSell"),
-    
-    -- Remotes Buka UI Toko (Sesuai event.txt)
-    OpenSellerMenu  = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("OpenSellerMenu"),
-    RequestOpenSeller = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("RequestOpenSeller"),
-    OpenBombShop    = ReplicatedStorage:FindFirstChild("BombRemotes") and ReplicatedStorage.BombRemotes:FindFirstChild("OpenShop"),
-    OpenRadarShop   = ReplicatedStorage:FindFirstChild("RadarRemotes") and ReplicatedStorage.RadarRemotes:FindFirstChild("OpenShop"),
-    ShopState       = ReplicatedStorage:FindFirstChild("ShopRemotes") and ReplicatedStorage.ShopRemotes:FindFirstChild("ShopState"),
-    UpgradeState    = ReplicatedStorage:FindFirstChild("UpgradeRemotes") and ReplicatedStorage.UpgradeRemotes:FindFirstChild("UpgradeState"),
+    DigRequest   = ReplicatedStorage:FindFirstChild("DigRemotes") and ReplicatedStorage.DigRemotes:FindFirstChild("DigRequest"),
+    SetDigPower  = ReplicatedStorage:FindFirstChild("DigRemotes") and ReplicatedStorage.DigRemotes:FindFirstChild("SetDigPower"),
+    PickupGem    = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("PickupGem"),
+    GemCollected = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("GemCollected"),
+    MineHit      = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("MineHit"),
+    RequestSell  = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("RequestSell"),
 }
 
 -- ===================================================================
--- FUNGSI UTILITAS TELEPORT & PLAYER LIST
+-- FUNGSI BUKA UI TOKO LANGSUNG DI PLAYERGUI & PROXIMITY PROMPT
+-- ===================================================================
+local function openShopUIByName(keywords, targetCFrame)
+    -- 1. Teleport ke lokasi toko
+    if targetCFrame then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.CFrame = targetCFrame + Vector3.new(0, 3, 0)
+        end
+        task.wait(0.3)
+    end
+
+    -- 2. Trigger ProximityPrompt di dekat lokasi toko jika ada
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") then
+                local part = obj.Parent
+                if part and part:IsA("BasePart") then
+                    if (part.Position - hrp.Position).Magnitude < 25 then
+                        if type(fireproximityprompt) == "function" then
+                            fireproximityprompt(obj)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- 3. Buka GUI langsung di PlayerGui
+    local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if not pg then return end
+
+    local opened = false
+    for _, gui in ipairs(pg:GetChildren()) do
+        if gui:IsA("ScreenGui") then
+            local gName = gui.Name:lower()
+            for _, kw in ipairs(keywords) do
+                if gName:find(kw:lower()) then
+                    gui.Enabled = true
+                    opened = true
+                    for _, child in ipairs(gui:GetDescendants()) do
+                        if child:IsA("Frame") or child:IsA("ImageLabel") then
+                            if child.Name:lower():find("shop") or child.Name:lower():find("menu") or child.Name:lower():find("main") then
+                                child.Visible = true
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return opened
+end
+
+-- ===================================================================
+-- TELEPORT & PLAYER LIST
 -- ===================================================================
 local function teleportTo(cf)
     local char = LocalPlayer.Character
@@ -219,7 +199,7 @@ local function getPlayerList()
 end
 
 -- ===================================================================
--- DETEKSI OTOMATIS KAPASITAS TAS
+-- DETEKSI KAPASITAS TAS
 -- ===================================================================
 local function detectActualBagCount()
     local ls = LocalPlayer:FindFirstChild("leaderstats") or LocalPlayer:FindFirstChild("Stats") or LocalPlayer:FindFirstChild("Data")
@@ -255,11 +235,10 @@ local function detectActualBagCount()
 end
 
 -- ===================================================================
--- BOOST DAYA HANCUR PICKAXE & AUTO DIG TERUKUR
+-- BOOST DAYA HANCUR PICKAXE & AUTO DIG
 -- ===================================================================
 local function boostPickaxePower()
     if not State.EnablePowerBoost then return end
-    
     if Remotes.SetDigPower then
         pcall(function() Remotes.SetDigPower:FireServer(State.PickaxePowerBoost) end)
     end
@@ -299,12 +278,8 @@ local function boostPickaxePower()
 end
 
 local function triggerDigAction()
-    if Remotes.DigRequest then
-        pcall(function() Remotes.DigRequest:FireServer() end)
-    end
-    if Remotes.MineHit then
-        pcall(function() Remotes.MineHit:FireServer() end)
-    end
+    if Remotes.DigRequest then pcall(function() Remotes.DigRequest:FireServer() end) end
+    if Remotes.MineHit then pcall(function() Remotes.MineHit:FireServer() end) end
 
     local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
     if pg then
@@ -378,7 +353,6 @@ end
 local function findCrystalsInMap()
     local list = {}
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        -- 🛑 FILTER KEBUN: Abaikan kristal yang berada di Plot/Kebun player lain!
         if not isInsidePlot(obj) then
             local n = obj.Name:lower()
             if (obj:IsA("BasePart") or obj:IsA("Model")) and 
@@ -407,7 +381,6 @@ end
 -- ===================================================================
 local function autoPickupGemLoop()
     if not State.AutoPickupGem then return end
-    
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
@@ -420,12 +393,8 @@ local function autoPickupGemLoop()
                     local pos = obj:IsA("Model") and obj:GetPivot().Position or obj.Position
                     local dist = (hrp.Position - pos).Magnitude
                     if dist < 60 then
-                        if Remotes.PickupGem then
-                            pcall(function() Remotes.PickupGem:FireServer(obj) end)
-                        end
-                        if Remotes.GemCollected then
-                            pcall(function() Remotes.GemCollected:FireServer(obj) end)
-                        end
+                        if Remotes.PickupGem then pcall(function() Remotes.PickupGem:FireServer(obj) end) end
+                        if Remotes.GemCollected then pcall(function() Remotes.GemCollected:FireServer(obj) end) end
 
                         local prompt = obj:FindFirstChildOfClass("ProximityPrompt", true)
                         if prompt and type(fireproximityprompt) == "function" then
@@ -449,43 +418,25 @@ local function executeAutoReturnToSell()
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if hrp then
         State.LastMiningPosition = hrp.CFrame
-        WindUI:Notify({
-            Title = "🎒 Tas Penuh!",
-            Content = "Teleport ke Toko Jual (Sell) untuk mengosongkan tas...",
-            Duration = 3
-        })
+        WindUI:Notify({ Title = "🎒 Tas Penuh!", Content = "Teleport ke Toko Jual (Sell)...", Duration = 3 })
 
         teleportTo(State.Waypoints["🏪 Toko Jual (Sell)"])
         task.wait(1.0)
 
-        if Remotes.RequestSell then
-            pcall(function() Remotes.RequestSell:FireServer() end)
-        end
-        if Remotes.TeleportSell then
-            pcall(function() Remotes.TeleportSell:FireServer() end)
-        end
-        for _, r in ipairs(ReplicatedStorage:GetDescendants()) do
-            if r:IsA("RemoteEvent") and (r.Name:lower():find("sell") or r.Name:lower():find("jual")) then
-                pcall(function() r:FireServer() end)
-            end
-        end
+        openShopUIByName({ "sell", "jual", "seller" })
+        if Remotes.RequestSell then pcall(function() Remotes.RequestSell:FireServer() end) end
 
         State.CurrentBag = 0
         task.wait(1.5)
 
         if State.LastMiningPosition then
             teleportTo(State.LastMiningPosition)
-            WindUI:Notify({
-                Title = "💎 Lanjut Menambang",
-                Content = "Kembali ke posisi gunung sebelumnya!",
-                Duration = 2
-            })
+            WindUI:Notify({ Title = "💎 Lanjut Menambang", Content = "Kembali ke posisi gunung sebelumnya!", Duration = 2 })
         end
     end
     State.IsReturning = false
 end
 
--- Loop Main Auto Mine & Auto Return
 task.spawn(function()
     while true do
         detectActualBagCount()
@@ -515,37 +466,22 @@ task.spawn(function()
 end)
 
 -- ===================================================================
--- PLAYER TARGET, FOLLOW, & GENDONG (CARRY) LOOP
+-- PLAYER TARGET & FOLLOW LOOP (TANPA GENDONG FE)
 -- ===================================================================
 task.spawn(function()
     while true do
-        local char = LocalPlayer.Character
-        local myHrp = char and char:FindFirstChild("HumanoidRootPart")
-
-        if State.SelectedPlayerName and myHrp then
+        if State.LoopFollowPlayer and State.SelectedPlayerName then
             local targetP = Players:FindFirstChild(State.SelectedPlayerName)
             if targetP and targetP.Character and targetP.Character:FindFirstChild("HumanoidRootPart") then
-                local targetHrp = targetP.Character.HumanoidRootPart
-
-                -- 1. Auto Follow / Spectate
-                if State.LoopFollowPlayer and not State.CarryPlayer then
-                    teleportTo(targetHrp.CFrame + Vector3.new(0, 0, 3))
-                end
-
-                -- 2. Gendong / Carry Player (Paksa menempel pada karakter kita)
-                if State.CarryPlayer then
-                    pcall(function()
-                        targetHrp.CFrame = myHrp.CFrame * CFrame.new(0, 1.5, 1.8)
-                    end)
-                end
+                teleportTo(targetP.Character.HumanoidRootPart.CFrame + Vector3.new(0, 0, 3))
             end
         end
-        task.wait(0.05)
+        task.wait(0.2)
     end
 end)
 
 -- ===================================================================
--- DARAH PENUH, GODMODE, & INFINITE JUMP
+-- DARAH PENUH & INFINITE JUMP
 -- ===================================================================
 local function applyHealthGuard(char)
     if not char then return end
@@ -579,15 +515,11 @@ RunService.Stepped:Connect(function()
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hrp and hum then
-        if State.WalkSpeed > 16 and hum.WalkSpeed ~= State.WalkSpeed then
-            hum.WalkSpeed = State.WalkSpeed
-        end
+        if State.WalkSpeed > 16 and hum.WalkSpeed ~= State.WalkSpeed then hum.WalkSpeed = State.WalkSpeed end
         if State.AntiFallDamage and hrp.AssemblyLinearVelocity.Y < -55 then
             hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, -20, hrp.AssemblyLinearVelocity.Z)
         end
-        if State.GodMode and hum.Health < hum.MaxHealth and hum.Health > 0 then
-            hum.Health = hum.MaxHealth
-        end
+        if State.GodMode and hum.Health < hum.MaxHealth and hum.Health > 0 then hum.Health = hum.MaxHealth end
     end
 
     if State.Noclip and char then
@@ -626,11 +558,6 @@ local QuickCorner = Instance.new("UICorner")
 QuickCorner.CornerRadius = UDim.new(0, 10)
 QuickCorner.Parent = QuickFlyBtn
 
-local QuickStroke = Instance.new("UIStroke")
-QuickStroke.Color = Color3.fromRGB(60, 75, 100)
-QuickStroke.Thickness = 1.5
-QuickStroke.Parent = QuickFlyBtn
-
 local LeftFrame = Instance.new("Frame")
 LeftFrame.Name = "LeftHorizontalPad"
 LeftFrame.Size = UDim2.new(0, 135, 0, 135)
@@ -641,10 +568,6 @@ LeftFrame.Active = true
 LeftFrame.Draggable = true
 LeftFrame.Visible = false
 LeftFrame.Parent = ControlGui
-
-local LeftCorner = Instance.new("UICorner")
-LeftCorner.CornerRadius = UDim.new(0, 16)
-LeftCorner.Parent = LeftFrame
 
 local RightFrame = Instance.new("Frame")
 RightFrame.Name = "RightVerticalPad"
@@ -657,10 +580,6 @@ RightFrame.Draggable = true
 RightFrame.Visible = false
 RightFrame.Parent = ControlGui
 
-local RightCorner = Instance.new("UICorner")
-RightCorner.CornerRadius = UDim.new(0, 16)
-RightCorner.Parent = RightFrame
-
 local function createTouchBtn(parent, text, pos, size, key)
     local btn = Instance.new("TextButton")
     btn.Text = text
@@ -671,10 +590,6 @@ local function createTouchBtn(parent, text, pos, size, key)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 16
     btn.Parent = parent
-    
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 8)
-    c.Parent = btn
 
     btn.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -738,9 +653,7 @@ local function setFlying(active)
     updateControlPads()
 end
 
-QuickFlyBtn.MouseButton1Click:Connect(function()
-    setFlying(not State.Flying)
-end)
+QuickFlyBtn.MouseButton1Click:Connect(function() setFlying(not State.Flying) end)
 
 RunService.RenderStepped:Connect(function()
     if not State.Flying or not flyBv or not flyBg then return end
@@ -759,11 +672,7 @@ RunService.RenderStepped:Connect(function()
     if State.FlyKeys.Up then dir = dir + Vector3.new(0, 1, 0) end
     if State.FlyKeys.Down then dir = dir - Vector3.new(0, 1, 0) end
 
-    if dir.Magnitude > 0 then
-        flyBv.Velocity = dir.Unit * State.FlySpeed
-    else
-        flyBv.Velocity = Vector3.zero
-    end
+    if dir.Magnitude > 0 then flyBv.Velocity = dir.Unit * State.FlySpeed else flyBv.Velocity = Vector3.zero end
     flyBg.CFrame = Camera.CFrame
 end)
 
@@ -793,7 +702,7 @@ end)
 -- WINDUI WINDOW & TABS BUILDER
 -- ===================================================================
 local Window = WindUI:CreateWindow({
-    Title = "❄️ Antartica Mining Hub v4.2",
+    Title = "❄️ Antartica Mining Hub v4.3",
     Icon = "mountain",
     Author = "by Rhdevs",
     Folder = "AntarticaHub",
@@ -801,12 +710,12 @@ local Window = WindUI:CreateWindow({
     Theme = "Dark",
 })
 
--- TAB 1: PLAYER TARGET & CARRY (GENDONG)
+-- TAB 1: PLAYER TARGET (BERSIH DARI FITUR GENDONG FE)
 local PlayerTab = Window:Tab({ Title = "Target Player", Icon = "user" })
 
 local playerDropdown = PlayerTab:Dropdown({
     Title = "🎯 Pilih Player Target",
-    Desc = "Pilih pemain aktif di server untuk teleport, follow, atau digendong",
+    Desc = "Pilih pemain aktif di server untuk teleport atau di-follow",
     Values = getPlayerList(),
     Default = nil,
     Callback = function(val)
@@ -820,43 +729,27 @@ PlayerTab:Button({
     Callback = function()
         local newList = getPlayerList()
         playerDropdown:SetValues(newList)
-        WindUI:Notify({ Title = "Player List", Content = "Daftar pemain berhasil diperbarui!", Duration = 2 })
+        WindUI:Notify({ Title = "Player List", Content = "Daftar pemain diperbarui!", Duration = 2 })
     end
 })
 
 PlayerTab:Button({
     Title = "⚡ Teleport ke Player Target",
-    Desc = "Langsung berpindah ke posisi pemain yang dipilih",
+    Desc = "Berpindah langsung ke lokasi player target",
     Callback = function()
         if State.SelectedPlayerName then
             local targetP = Players:FindFirstChild(State.SelectedPlayerName)
             if targetP and targetP.Character and targetP.Character:FindFirstChild("HumanoidRootPart") then
                 teleportTo(targetP.Character.HumanoidRootPart.CFrame)
                 WindUI:Notify({ Title = "Teleport Success", Content = "Berpindah ke " .. State.SelectedPlayerName, Duration = 2 })
-            else
-                WindUI:Notify({ Title = "Error", Content = "Karakter target tidak ditemukan!", Duration = 2 })
             end
-        else
-            WindUI:Notify({ Title = "Info", Content = "Pilih player terlebih dahulu!", Duration = 2 })
-        end
-    end
-})
-
-PlayerTab:Toggle({
-    Title = "🎒 Gendong Player Target (Attach / Carry)",
-    Desc = "Menempelkan player target ke belakang kamu dan membawa mereka berjalan/terbang",
-    Default = false,
-    Callback = function(state)
-        State.CarryPlayer = state
-        if state then
-            WindUI:Notify({ Title = "Carry Active", Content = "Menggendong player " .. tostring(State.SelectedPlayerName), Duration = 2 })
         end
     end
 })
 
 PlayerTab:Toggle({
     Title = "🔄 Auto Follow / Spectate Player",
-    Desc = "Terus-menerus melayang mengikuti target player",
+    Desc = "Melayang & mengikuti pergerakan player target",
     Default = false,
     Callback = function(state)
         State.LoopFollowPlayer = state
@@ -867,8 +760,8 @@ PlayerTab:Toggle({
 local AutoTab = Window:Tab({ Title = "Mining & Gems", Icon = "zap" })
 
 AutoTab:Toggle({
-    Title = "💎 Auto Mine Kristal Termahal (Ignore Plot)",
-    Desc = "Mencari & TP ke kristal termahal di gunung (Filter: Mengabaikan Kebun/Plot Player)",
+    Title = "💎 Auto Mine Kristal Termahal (Filter Plot)",
+    Desc = "Mencari & TP ke kristal termahal di gunung (Mengabaikan Kebun/Plot Player)",
     Default = false,
     Callback = function(state)
         State.AutoMineMostExpensive = state
@@ -885,8 +778,8 @@ AutoTab:Toggle({
 })
 
 AutoTab:Toggle({
-    Title = "⛏️ Auto Dig Continuous (Ketuk Gunung AFK)",
-    Desc = "AFK Penggalian berulang di lereng gunung hingga lapisan tanah hancur & kristal terbebas",
+    Title = "⛏️ Auto Dig Continuous (Ketuk Gunung)",
+    Desc = "AFK Penggalian berulang di tebing gunung hingga lapisan tanah hancur",
     Default = false,
     Callback = function(state)
         State.AutoDig = state
@@ -895,7 +788,7 @@ AutoTab:Toggle({
 
 AutoTab:Slider({
     Title = "💥 Power Boost Pickaxe",
-    Desc = "Atur nilai daya hancur pickaxe (Disatukan agar tidak terlalu berlebihan)",
+    Desc = "Atur nilai daya hancur pickaxe (Default: 5.000)",
     Step = 500,
     Value = { Min = 500, Max = 20000, Default = 5000 },
     Callback = function(val)
@@ -904,64 +797,63 @@ AutoTab:Slider({
     end
 })
 
--- TAB 3: TELEPORTS & BUKA UI TOKO
+-- TAB 3: TELEPORTS & BUKA TOKO GUI
 local TpTab = Window:Tab({ Title = "Teleports & Shops", Icon = "map-pin" })
 
 TpTab:Button({
-    Title = "🏪 TP & Buka Toko Jual (Seller Menu)",
-    Desc = "TP ke Toko Jual & pemicu Remote UI Seller Menu",
+    Title = "🏪 TP & Buka Toko Jual (Sell Area)",
+    Desc = "Teleport & buka GUI Toko Jual",
     Callback = function()
-        teleportTo(State.Waypoints["🏪 Toko Jual (Sell)"])
-        if Remotes.OpenSellerMenu then pcall(function() Remotes.OpenSellerMenu:FireServer() end) end
-        if Remotes.RequestOpenSeller then pcall(function() Remotes.RequestOpenSeller:FireServer() end) end
+        openShopUIByName({ "sell", "jual", "seller" }, State.Waypoints["🏪 Toko Jual (Sell)"])
+        WindUI:Notify({ Title = "Toko Jual", Content = "Membuka UI Toko Jual...", Duration = 2 })
     end
 })
 
 TpTab:Button({
     Title = "💣 TP & Buka Toko Bom",
-    Desc = "TP ke Toko Bom & pemicu Remote UI Bomb Shop",
+    Desc = "Teleport & buka GUI Toko Bom",
     Callback = function()
-        teleportTo(State.Waypoints["💣 Toko Bom (Bomb)"])
-        if Remotes.OpenBombShop then pcall(function() Remotes.OpenBombShop:FireServer() end) end
+        openShopUIByName({ "bomb", "bom" }, State.Waypoints["💣 Toko Bom (Bomb)"])
+        WindUI:Notify({ Title = "Toko Bom", Content = "Membuka UI Toko Bom...", Duration = 2 })
     end
 })
 
 TpTab:Button({
     Title = "⛏️ TP & Buka Toko Pickaxes",
-    Desc = "TP ke Toko Pickaxe & pemicu Remote ShopState",
+    Desc = "Teleport & buka GUI Toko Pickaxes",
     Callback = function()
-        teleportTo(State.Waypoints["⛏️ Toko Pickaxes"])
-        if Remotes.ShopState then pcall(function() Remotes.ShopState:FireServer(true) end) end
+        openShopUIByName({ "pick", "pickaxe" }, State.Waypoints["⛏️ Toko Pickaxes"])
+        WindUI:Notify({ Title = "Toko Pickaxe", Content = "Membuka UI Toko Pickaxe...", Duration = 2 })
     end
 })
 
 TpTab:Button({
     Title = "⚡ TP & Buka Toko Upgrade",
-    Desc = "TP ke Toko Upgrade & pemicu Remote UpgradeState",
+    Desc = "Teleport & buka GUI Toko Upgrade",
     Callback = function()
-        teleportTo(State.Waypoints["⚡ Toko Upgrade"])
-        if Remotes.UpgradeState then pcall(function() Remotes.UpgradeState:FireServer(true) end) end
+        openShopUIByName({ "upgrade", "stat" }, State.Waypoints["⚡ Toko Upgrade"])
+        WindUI:Notify({ Title = "Toko Upgrade", Content = "Membuka UI Toko Upgrade...", Duration = 2 })
     end
 })
 
 TpTab:Button({
     Title = "📡 TP & Buka Toko Radars",
-    Desc = "TP ke Toko Radar & pemicu Remote UI Radar Shop",
+    Desc = "Teleport & buka GUI Toko Radar",
     Callback = function()
-        teleportTo(State.Waypoints["📡 Toko Radars"])
-        if Remotes.OpenRadarShop then pcall(function() Remotes.OpenRadarShop:FireServer() end) end
+        openShopUIByName({ "radar" }, State.Waypoints["📡 Toko Radars"])
+        WindUI:Notify({ Title = "Toko Radar", Content = "Membuka UI Toko Radar...", Duration = 2 })
     end
 })
 
 TpTab:Button({
     Title = "🏔️ TP: Puncak Gunung (Peak)",
-    Desc = "Teleportasi ke tempat kristal langka di puncak",
+    Desc = "Teleportasi ke puncak gunung",
     Callback = function()
         teleportTo(State.Waypoints["🏔️ Puncak Gunung (Peak)"])
     end
 })
 
--- TAB 4: LIGHTING & MAP INSPECTOR
+-- TAB 4: LIGHTING & INSPECTOR
 local MapTab = Window:Tab({ Title = "Map Inspector", Icon = "sun" })
 
 MapTab:Slider({
@@ -976,7 +868,7 @@ MapTab:Slider({
 
 MapTab:Toggle({
     Title = "💡 Fullbright (Terangkan Gua/Gunung)",
-    Desc = "Menghilangkan kegelapan dan membuat seluruh map terang benderang",
+    Desc = "Menghilangkan kegelapan pada map",
     Default = false,
     Callback = function(state)
         State.Fullbright = state
@@ -987,7 +879,7 @@ MapTab:Toggle({
 
 MapTab:Toggle({
     Title = "🌫️ No Fog (Hapus Kabut Tebal)",
-    Desc = "Menghilangkan efek kabut di gunung agar jarak pandang jauh",
+    Desc = "Menghilangkan kabut tebal di gunung",
     Default = false,
     Callback = function(state)
         Lighting.FogEnd = state and 9e9 or 1000
@@ -996,65 +888,16 @@ MapTab:Toggle({
 
 MapTab:Toggle({
     Title = "🦘 Infinite Jump (Lompat Udara)",
-    Desc = "Memungkinkan karakter melompat terus-menerus di udara",
+    Desc = "Lompat terus-menerus di udara",
     Default = false,
     Callback = function(state)
         State.InfiniteJump = state
     end
 })
 
--- TAB 5: DEV REMOTES (OPEN UI SHOPS)
-local DevTab = Window:Tab({ Title = "Dev Remotes (UI)", Icon = "code" })
-
-DevTab:Button({
-    Title = "🛍️ Buka UI Toko Jual (Seller Menu)",
-    Desc = "Trigger OpenSellerMenu / RequestOpenSeller",
-    Callback = function()
-        if Remotes.OpenSellerMenu then pcall(function() Remotes.OpenSellerMenu:FireServer() end) end
-        if Remotes.RequestOpenSeller then pcall(function() Remotes.RequestOpenSeller:FireServer() end) end
-        WindUI:Notify({ Title = "UI Remote", Content = "OpenSellerMenu Fired!", Duration = 2 })
-    end
-})
-
-DevTab:Button({
-    Title = "💣 Buka UI Toko Bom",
-    Desc = "Trigger ReplicatedStorage.BombRemotes.OpenShop",
-    Callback = function()
-        if Remotes.OpenBombShop then pcall(function() Remotes.OpenBombShop:FireServer() end) end
-        WindUI:Notify({ Title = "UI Remote", Content = "OpenBombShop Fired!", Duration = 2 })
-    end
-})
-
-DevTab:Button({
-    Title = "📡 Buka UI Toko Radar",
-    Desc = "Trigger ReplicatedStorage.RadarRemotes.OpenShop",
-    Callback = function()
-        if Remotes.OpenRadarShop then pcall(function() Remotes.OpenRadarShop:FireServer() end) end
-        WindUI:Notify({ Title = "UI Remote", Content = "OpenRadarShop Fired!", Duration = 2 })
-    end
-})
-
-DevTab:Button({
-    Title = "⛏️ Trigger ShopState Pickaxes",
-    Desc = "Trigger ReplicatedStorage.ShopRemotes.ShopState",
-    Callback = function()
-        if Remotes.ShopState then pcall(function() Remotes.ShopState:FireServer(true) end) end
-        WindUI:Notify({ Title = "UI Remote", Content = "ShopState Fired!", Duration = 2 })
-    end
-})
-
-DevTab:Button({
-    Title = "⚡ Trigger UpgradeState",
-    Desc = "Trigger ReplicatedStorage.UpgradeRemotes.UpgradeState",
-    Callback = function()
-        if Remotes.UpgradeState then pcall(function() Remotes.UpgradeState:FireServer(true) end) end
-        WindUI:Notify({ Title = "UI Remote", Content = "UpgradeState Fired!", Duration = 2 })
-    end
-})
-
-print("❄️ Antartica Mining Hub (v4.2 Ultimate Edition) Berhasil Dimuat!")
+print("❄️ Antartica Mining Hub (v4.3 Fix Edition) Berhasil Dimuat!")
 WindUI:Notify({
-    Title = "❄️ Antartica Hub v4.2 Active",
-    Content = "Gendong Player, Filter Kebun Plot, Power Boost 5k & Remote Open UI Siap!",
+    Title = "❄️ Antartica Hub v4.3 Active",
+    Content = "Buka Toko GUI Direct, Filter Kebun Plot & Gendong Dihapus!",
     Duration = 4
 })
