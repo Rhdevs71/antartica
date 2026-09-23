@@ -1,18 +1,16 @@
 --[[
     ===================================================================
-    ❄️ ANTARTICA HUB - MOUNTAIN MINING & UTILITY (v4.0 Ultimate Edition)
+    ❄️ ANTARTICA HUB - MOUNTAIN MINING & UTILITY (v4.2 Ultimate Edition)
     ===================================================================
     UI Library: WindUI (https://github.com/Footagesus/WindUI)
     Dibuat untuk: Owner Game & Map Tester (Roblox Mountain Mining)
     
-    Fitur Baru (v4.0):
-      • 👥 Player Target & Teleport (List Player Aktif & Auto Follow/Spectate)
-      • 💎 Auto Mine Kristal Termahal (Prioritas Mythic > Legendary > Epic > Rare > ...)
-      • 🧲 Auto Ambil / Magnet Gem (Pemicu Otomatis PickupGem & GemCollected)
-      • 📡 Integrasi 103 RemoteEvent Resmi (GemRemotes, DigRemotes, ShopRemotes, dll)
-      • 👁️ Visual ESP 3D (Billboard & Highlight Kristal, Player, & Waypoint Toko)
-      • ☀️ Inspector Pencahayaan & Cuaca Map (Time of Day, Fullbright, No Fog)
-      • 📍 Dynamic Waypoint Manager (Simpan/Hapus Lokasi Kustom)
+    Fitur Baru (v4.2):
+      • 🎒 Fitur Gendong / Carry Player (Menempelkan player target agar terbawa berjalan/terbang)
+      • ⛏️ Pickaxe Power Boost Terukur (Nilai default disesuaikan ke 5.000 + Slider Kustom)
+      • 🛑 Filter Kebun / Plot (Mengabaikan kristal milik player lain di plot/kebun)
+      • 🛍️ Remote Buka UI Toko (Trigger UI Toko Jual, Bom, Radar, & Upgrade)
+      • 🏔️ AFK Mountain Continuous Dig (Mengetuk tebing gunung berulang hingga kristal terbebas)
     ===================================================================
 ]]
 
@@ -48,7 +46,7 @@ local function getSafeGuiParent()
 end
 
 -- ===================================================================
--- SISTEM LOGGING FILE LOKAL HP & CLIPBOARD SUNGGUHAN
+-- SISTEM LOGGING FILE LOKAL HP & CLIPBOARD
 -- ===================================================================
 local function saveLocalFile(fileName, content, isAppend)
     local timestamp = os.date("%Y-%m-%d %H:%M:%S")
@@ -80,7 +78,7 @@ local function copyToRealClipboard(text)
     return copied
 end
 
-saveLocalFile("antartica_logs.txt", "=== Antartica Hub v4.0 Ultimate Edition Dijalankan ===", true)
+saveLocalFile("antartica_logs.txt", "=== Antartica Hub v4.2 Ultimate Edition Dijalankan ===", true)
 
 -- ===================================================================
 -- LOAD WINDUI LIBRARY
@@ -126,12 +124,13 @@ local State = {
     
     -- Auto Dig & Mining
     AutoDig = false,
-    PickaxePowerBoost = 100000,
+    PickaxePowerBoost = 5000, -- Dikecilkan dari 100k sesuai permintaan
     EnablePowerBoost = true,
     
-    -- Target Player
+    -- Target Player & Carry (Gendong)
     SelectedPlayerName = nil,
     LoopFollowPlayer = false,
+    CarryPlayer = false,
 
     -- Auto Mine & Gem Magnet
     AutoMineMostExpensive = false,
@@ -173,25 +172,27 @@ local State = {
 }
 
 -- ===================================================================
--- REMOTES REFERENCE DARI EVENT.TXT
+-- REMOTES REFERENCE DARI EVENT.TXT (UI TOKO & GRINDING)
 -- ===================================================================
 local Remotes = {
     -- Dig & Power
-    DigRequest   = ReplicatedStorage:FindFirstChild("DigRemotes") and ReplicatedStorage.DigRemotes:FindFirstChild("DigRequest"),
-    SetDigPower  = ReplicatedStorage:FindFirstChild("DigRemotes") and ReplicatedStorage.DigRemotes:FindFirstChild("SetDigPower"),
+    DigRequest      = ReplicatedStorage:FindFirstChild("DigRemotes") and ReplicatedStorage.DigRemotes:FindFirstChild("DigRequest"),
+    SetDigPower     = ReplicatedStorage:FindFirstChild("DigRemotes") and ReplicatedStorage.DigRemotes:FindFirstChild("SetDigPower"),
     
     -- Gems & Selling
-    PickupGem    = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("PickupGem"),
-    GemCollected = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("GemCollected"),
-    MineHit      = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("MineHit"),
-    RequestSell  = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("RequestSell"),
-    TeleportSell = ReplicatedStorage:FindFirstChild("BackpackRemotes") and ReplicatedStorage.BackpackRemotes:FindFirstChild("TeleportSell"),
+    PickupGem       = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("PickupGem"),
+    GemCollected    = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("GemCollected"),
+    MineHit         = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("MineHit"),
+    RequestSell     = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("RequestSell"),
+    TeleportSell    = ReplicatedStorage:FindFirstChild("BackpackRemotes") and ReplicatedStorage.BackpackRemotes:FindFirstChild("TeleportSell"),
     
-    -- Shops & Upgrades
-    BuyPickaxe   = ReplicatedStorage:FindFirstChild("ShopRemotes") and ReplicatedStorage.ShopRemotes:FindFirstChild("BuyPickaxe"),
-    BuyUpgrade   = ReplicatedStorage:FindFirstChild("UpgradeRemotes") and ReplicatedStorage.UpgradeRemotes:FindFirstChild("BuyUpgrade"),
-    BuyBomb      = ReplicatedStorage:FindFirstChild("BombRemotes") and ReplicatedStorage.BombRemotes:FindFirstChild("BuyBomb"),
-    BuyRadar     = ReplicatedStorage:FindFirstChild("RadarRemotes") and ReplicatedStorage.RadarRemotes:FindFirstChild("BuyRadar"),
+    -- Remotes Buka UI Toko (Sesuai event.txt)
+    OpenSellerMenu  = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("OpenSellerMenu"),
+    RequestOpenSeller = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("RequestOpenSeller"),
+    OpenBombShop    = ReplicatedStorage:FindFirstChild("BombRemotes") and ReplicatedStorage.BombRemotes:FindFirstChild("OpenShop"),
+    OpenRadarShop   = ReplicatedStorage:FindFirstChild("RadarRemotes") and ReplicatedStorage.RadarRemotes:FindFirstChild("OpenShop"),
+    ShopState       = ReplicatedStorage:FindFirstChild("ShopRemotes") and ReplicatedStorage.ShopRemotes:FindFirstChild("ShopState"),
+    UpgradeState    = ReplicatedStorage:FindFirstChild("UpgradeRemotes") and ReplicatedStorage.UpgradeRemotes:FindFirstChild("UpgradeState"),
 }
 
 -- ===================================================================
@@ -203,17 +204,6 @@ local function teleportTo(cf)
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if hrp then
         hrp.CFrame = cf + Vector3.new(0, 3, 0)
-    end
-end
-
-local function smoothTeleportTo(cf, duration)
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        local tweenInfo = TweenInfo.new(duration or 1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        local tween = TweenService:Create(hrp, tweenInfo, { CFrame = cf + Vector3.new(0, 3, 0) })
-        tween:Play()
     end
 end
 
@@ -265,7 +255,7 @@ local function detectActualBagCount()
 end
 
 -- ===================================================================
--- BOOST DAYA HANCUR PICKAXE & AUTO DIG
+-- BOOST DAYA HANCUR PICKAXE & AUTO DIG TERUKUR
 -- ===================================================================
 local function boostPickaxePower()
     if not State.EnablePowerBoost then return end
@@ -311,6 +301,9 @@ end
 local function triggerDigAction()
     if Remotes.DigRequest then
         pcall(function() Remotes.DigRequest:FireServer() end)
+    end
+    if Remotes.MineHit then
+        pcall(function() Remotes.MineHit:FireServer() end)
     end
 
     local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
@@ -360,7 +353,7 @@ task.spawn(function()
     while true do
         if State.AutoDig then
             triggerDigAction()
-            task.wait(0.05)
+            task.wait(0.06)
         else
             task.wait(0.3)
         end
@@ -368,26 +361,41 @@ task.spawn(function()
 end)
 
 -- ===================================================================
--- PENCARIAN KRISTAL TERMAHAL DI WORKSPACE
+-- PENCARIAN KRISTAL DENGAN FILTER KEBUN / PLOT PLAYER
 -- ===================================================================
+local function isInsidePlot(obj)
+    local current = obj
+    while current and current ~= Workspace do
+        local n = current.Name:lower()
+        if n:find("plot") or n:find("kebun") or n:find("garden") or n:find("farm") or n:find("base") or n:find("pajangan") then
+            return true
+        end
+        current = current.Parent
+    end
+    return false
+end
+
 local function findCrystalsInMap()
     local list = {}
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        local n = obj.Name:lower()
-        if (obj:IsA("BasePart") or obj:IsA("Model")) and 
-           (n:find("crystal") or n:find("kristal") or n:find("ore") or n:find("gem")) then
-            local cf = obj:IsA("Model") and obj:GetPivot() or obj.CFrame
-            local r = "Common"
-            for rName in pairs(State.RarityConfig) do
-                if n:find(rName:lower()) then r = rName break end
+        -- 🛑 FILTER KEBUN: Abaikan kristal yang berada di Plot/Kebun player lain!
+        if not isInsidePlot(obj) then
+            local n = obj.Name:lower()
+            if (obj:IsA("BasePart") or obj:IsA("Model")) and 
+               (n:find("crystal") or n:find("kristal") or n:find("ore") or n:find("gem")) then
+                local cf = obj:IsA("Model") and obj:GetPivot() or obj.CFrame
+                local r = "Common"
+                for rName in pairs(State.RarityConfig) do
+                    if n:find(rName:lower()) then r = rName break end
+                end
+                table.insert(list, {
+                    Instance = obj,
+                    CFrame = cf,
+                    Rarity = r,
+                    Price = State.RarityConfig[r].Price,
+                    Priority = State.RarityConfig[r].Priority
+                })
             end
-            table.insert(list, {
-                Instance = obj,
-                CFrame = cf,
-                Rarity = r,
-                Price = State.RarityConfig[r].Price,
-                Priority = State.RarityConfig[r].Priority
-            })
         end
     end
     table.sort(list, function(a, b) return a.Priority > b.Priority end)
@@ -405,22 +413,24 @@ local function autoPickupGemLoop()
     if not hrp then return end
 
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        local n = obj.Name:lower()
-        if n:find("gem") or n:find("crystal") or n:find("drop") then
-            if obj:IsA("BasePart") or obj:IsA("Model") then
-                local pos = obj:IsA("Model") and obj:GetPivot().Position or obj.Position
-                local dist = (hrp.Position - pos).Magnitude
-                if dist < 60 then
-                    if Remotes.PickupGem then
-                        pcall(function() Remotes.PickupGem:FireServer(obj) end)
-                    end
-                    if Remotes.GemCollected then
-                        pcall(function() Remotes.GemCollected:FireServer(obj) end)
-                    end
+        if not isInsidePlot(obj) then
+            local n = obj.Name:lower()
+            if n:find("gem") or n:find("crystal") or n:find("drop") then
+                if obj:IsA("BasePart") or obj:IsA("Model") then
+                    local pos = obj:IsA("Model") and obj:GetPivot().Position or obj.Position
+                    local dist = (hrp.Position - pos).Magnitude
+                    if dist < 60 then
+                        if Remotes.PickupGem then
+                            pcall(function() Remotes.PickupGem:FireServer(obj) end)
+                        end
+                        if Remotes.GemCollected then
+                            pcall(function() Remotes.GemCollected:FireServer(obj) end)
+                        end
 
-                    local prompt = obj:FindFirstChildOfClass("ProximityPrompt", true)
-                    if prompt and type(fireproximityprompt) == "function" then
-                        fireproximityprompt(prompt)
+                        local prompt = obj:FindFirstChildOfClass("ProximityPrompt", true)
+                        if prompt and type(fireproximityprompt) == "function" then
+                            fireproximityprompt(prompt)
+                        end
                     end
                 end
             end
@@ -505,18 +515,32 @@ task.spawn(function()
 end)
 
 -- ===================================================================
--- PLAYER TARGET & FOLLOW LOOP
+-- PLAYER TARGET, FOLLOW, & GENDONG (CARRY) LOOP
 -- ===================================================================
 task.spawn(function()
     while true do
-        if State.LoopFollowPlayer and State.SelectedPlayerName then
+        local char = LocalPlayer.Character
+        local myHrp = char and char:FindFirstChild("HumanoidRootPart")
+
+        if State.SelectedPlayerName and myHrp then
             local targetP = Players:FindFirstChild(State.SelectedPlayerName)
             if targetP and targetP.Character and targetP.Character:FindFirstChild("HumanoidRootPart") then
-                local targetCf = targetP.Character.HumanoidRootPart.CFrame
-                teleportTo(targetCf + Vector3.new(0, 0, 3))
+                local targetHrp = targetP.Character.HumanoidRootPart
+
+                -- 1. Auto Follow / Spectate
+                if State.LoopFollowPlayer and not State.CarryPlayer then
+                    teleportTo(targetHrp.CFrame + Vector3.new(0, 0, 3))
+                end
+
+                -- 2. Gendong / Carry Player (Paksa menempel pada karakter kita)
+                if State.CarryPlayer then
+                    pcall(function()
+                        targetHrp.CFrame = myHrp.CFrame * CFrame.new(0, 1.5, 1.8)
+                    end)
+                end
             end
         end
-        task.wait(0.2)
+        task.wait(0.05)
     end
 end)
 
@@ -769,7 +793,7 @@ end)
 -- WINDUI WINDOW & TABS BUILDER
 -- ===================================================================
 local Window = WindUI:CreateWindow({
-    Title = "❄️ Antartica Mining Hub v4.0",
+    Title = "❄️ Antartica Mining Hub v4.2",
     Icon = "mountain",
     Author = "by Rhdevs",
     Folder = "AntarticaHub",
@@ -777,12 +801,12 @@ local Window = WindUI:CreateWindow({
     Theme = "Dark",
 })
 
--- TAB 1: PLAYER TARGET (FITUR BARU DARI PENGGUNA)
+-- TAB 1: PLAYER TARGET & CARRY (GENDONG)
 local PlayerTab = Window:Tab({ Title = "Target Player", Icon = "user" })
 
 local playerDropdown = PlayerTab:Dropdown({
     Title = "🎯 Pilih Player Target",
-    Desc = "Pilih pemain aktif di server untuk teleport atau di-follow",
+    Desc = "Pilih pemain aktif di server untuk teleport, follow, atau digendong",
     Values = getPlayerList(),
     Default = nil,
     Callback = function(val)
@@ -819,8 +843,20 @@ PlayerTab:Button({
 })
 
 PlayerTab:Toggle({
+    Title = "🎒 Gendong Player Target (Attach / Carry)",
+    Desc = "Menempelkan player target ke belakang kamu dan membawa mereka berjalan/terbang",
+    Default = false,
+    Callback = function(state)
+        State.CarryPlayer = state
+        if state then
+            WindUI:Notify({ Title = "Carry Active", Content = "Menggendong player " .. tostring(State.SelectedPlayerName), Duration = 2 })
+        end
+    end
+})
+
+PlayerTab:Toggle({
     Title = "🔄 Auto Follow / Spectate Player",
-    Desc = "Terus-menerus menempel dan melayang di sebelah target player",
+    Desc = "Terus-menerus melayang mengikuti target player",
     Default = false,
     Callback = function(state)
         State.LoopFollowPlayer = state
@@ -831,8 +867,8 @@ PlayerTab:Toggle({
 local AutoTab = Window:Tab({ Title = "Mining & Gems", Icon = "zap" })
 
 AutoTab:Toggle({
-    Title = "💎 Auto Mine Kristal Termahal (Priority)",
-    Desc = "Mencari dan TP ke kristal dengan nilai termahal terlebih dahulu (Mythic > Legendary > Epic)",
+    Title = "💎 Auto Mine Kristal Termahal (Ignore Plot)",
+    Desc = "Mencari & TP ke kristal termahal di gunung (Filter: Mengabaikan Kebun/Plot Player)",
     Default = false,
     Callback = function(state)
         State.AutoMineMostExpensive = state
@@ -841,7 +877,7 @@ AutoTab:Toggle({
 
 AutoTab:Toggle({
     Title = "🧲 Auto Ambil / Magnet Gem",
-    Desc = "Otomatis memicu sinyal PickupGem resmi untuk gem jatuh di sekitar",
+    Desc = "Otomatis menyedot gem jatuh di sekitar tanpa perlu disentuh",
     Default = true,
     Callback = function(state)
         State.AutoPickupGem = state
@@ -849,34 +885,81 @@ AutoTab:Toggle({
 })
 
 AutoTab:Toggle({
-    Title = "⛏️ Auto Dig (Tombol & Tool Dig)",
-    Desc = "Otomatis menekan tombol DIG layar HP & swung pickaxe",
+    Title = "⛏️ Auto Dig Continuous (Ketuk Gunung AFK)",
+    Desc = "AFK Penggalian berulang di lereng gunung hingga lapisan tanah hancur & kristal terbebas",
     Default = false,
     Callback = function(state)
         State.AutoDig = state
     end
 })
 
-AutoTab:Toggle({
-    Title = "💥 Aktifkan Pickaxe Power Boost",
-    Desc = "Meningkatkan daya hancur pickaxe ke 100.000+",
-    Default = true,
-    Callback = function(state)
-        State.EnablePowerBoost = state
-        if state then boostPickaxePower() end
+AutoTab:Slider({
+    Title = "💥 Power Boost Pickaxe",
+    Desc = "Atur nilai daya hancur pickaxe (Disatukan agar tidak terlalu berlebihan)",
+    Step = 500,
+    Value = { Min = 500, Max = 20000, Default = 5000 },
+    Callback = function(val)
+        State.PickaxePowerBoost = val
+        if State.EnablePowerBoost then boostPickaxePower() end
     end
 })
 
--- TAB 3: TELEPORTS & WAYPOINTS
-local TpTab = Window:Tab({ Title = "Teleports", Icon = "map-pin" })
+-- TAB 3: TELEPORTS & BUKA UI TOKO
+local TpTab = Window:Tab({ Title = "Teleports & Shops", Icon = "map-pin" })
 
-for wpName, cf in pairs(State.Waypoints) do
-    TpTab:Button({
-        Title = wpName,
-        Desc = string.format("Koordinat: (%.1f, %.1f, %.1f)", cf.Position.X, cf.Position.Y, cf.Position.Z),
-        Callback = function() teleportTo(cf) end
-    })
-end
+TpTab:Button({
+    Title = "🏪 TP & Buka Toko Jual (Seller Menu)",
+    Desc = "TP ke Toko Jual & pemicu Remote UI Seller Menu",
+    Callback = function()
+        teleportTo(State.Waypoints["🏪 Toko Jual (Sell)"])
+        if Remotes.OpenSellerMenu then pcall(function() Remotes.OpenSellerMenu:FireServer() end) end
+        if Remotes.RequestOpenSeller then pcall(function() Remotes.RequestOpenSeller:FireServer() end) end
+    end
+})
+
+TpTab:Button({
+    Title = "💣 TP & Buka Toko Bom",
+    Desc = "TP ke Toko Bom & pemicu Remote UI Bomb Shop",
+    Callback = function()
+        teleportTo(State.Waypoints["💣 Toko Bom (Bomb)"])
+        if Remotes.OpenBombShop then pcall(function() Remotes.OpenBombShop:FireServer() end) end
+    end
+})
+
+TpTab:Button({
+    Title = "⛏️ TP & Buka Toko Pickaxes",
+    Desc = "TP ke Toko Pickaxe & pemicu Remote ShopState",
+    Callback = function()
+        teleportTo(State.Waypoints["⛏️ Toko Pickaxes"])
+        if Remotes.ShopState then pcall(function() Remotes.ShopState:FireServer(true) end) end
+    end
+})
+
+TpTab:Button({
+    Title = "⚡ TP & Buka Toko Upgrade",
+    Desc = "TP ke Toko Upgrade & pemicu Remote UpgradeState",
+    Callback = function()
+        teleportTo(State.Waypoints["⚡ Toko Upgrade"])
+        if Remotes.UpgradeState then pcall(function() Remotes.UpgradeState:FireServer(true) end) end
+    end
+})
+
+TpTab:Button({
+    Title = "📡 TP & Buka Toko Radars",
+    Desc = "TP ke Toko Radar & pemicu Remote UI Radar Shop",
+    Callback = function()
+        teleportTo(State.Waypoints["📡 Toko Radars"])
+        if Remotes.OpenRadarShop then pcall(function() Remotes.OpenRadarShop:FireServer() end) end
+    end
+})
+
+TpTab:Button({
+    Title = "🏔️ TP: Puncak Gunung (Peak)",
+    Desc = "Teleportasi ke tempat kristal langka di puncak",
+    Callback = function()
+        teleportTo(State.Waypoints["🏔️ Puncak Gunung (Peak)"])
+    end
+})
 
 -- TAB 4: LIGHTING & MAP INSPECTOR
 local MapTab = Window:Tab({ Title = "Map Inspector", Icon = "sun" })
@@ -920,45 +1003,58 @@ MapTab:Toggle({
     end
 })
 
--- TAB 5: DEV REMOTES (DARI EVENT.TXT)
-local DevTab = Window:Tab({ Title = "Dev Remotes (103)", Icon = "code" })
+-- TAB 5: DEV REMOTES (OPEN UI SHOPS)
+local DevTab = Window:Tab({ Title = "Dev Remotes (UI)", Icon = "code" })
 
 DevTab:Button({
-    Title = "🛒 Test Remote: Beli Pickaxe",
-    Desc = "Trigger ReplicatedStorage.ShopRemotes.BuyPickaxe",
+    Title = "🛍️ Buka UI Toko Jual (Seller Menu)",
+    Desc = "Trigger OpenSellerMenu / RequestOpenSeller",
     Callback = function()
-        if Remotes.BuyPickaxe then
-            Remotes.BuyPickaxe:FireServer("Basic Pickaxe")
-            WindUI:Notify({ Title = "Remote Triggered", Content = "BuyPickaxe Fired!", Duration = 2 })
-        end
+        if Remotes.OpenSellerMenu then pcall(function() Remotes.OpenSellerMenu:FireServer() end) end
+        if Remotes.RequestOpenSeller then pcall(function() Remotes.RequestOpenSeller:FireServer() end) end
+        WindUI:Notify({ Title = "UI Remote", Content = "OpenSellerMenu Fired!", Duration = 2 })
     end
 })
 
 DevTab:Button({
-    Title = "⚡ Test Remote: Beli Upgrade",
-    Desc = "Trigger ReplicatedStorage.UpgradeRemotes.BuyUpgrade",
+    Title = "💣 Buka UI Toko Bom",
+    Desc = "Trigger ReplicatedStorage.BombRemotes.OpenShop",
     Callback = function()
-        if Remotes.BuyUpgrade then
-            Remotes.BuyUpgrade:FireServer("Capacity")
-            WindUI:Notify({ Title = "Remote Triggered", Content = "BuyUpgrade Fired!", Duration = 2 })
-        end
+        if Remotes.OpenBombShop then pcall(function() Remotes.OpenBombShop:FireServer() end) end
+        WindUI:Notify({ Title = "UI Remote", Content = "OpenBombShop Fired!", Duration = 2 })
     end
 })
 
 DevTab:Button({
-    Title = "💰 Test Remote: Request Sell (Jual All)",
-    Desc = "Trigger ReplicatedStorage.GemRemotes.RequestSell",
+    Title = "📡 Buka UI Toko Radar",
+    Desc = "Trigger ReplicatedStorage.RadarRemotes.OpenShop",
     Callback = function()
-        if Remotes.RequestSell then
-            Remotes.RequestSell:FireServer()
-            WindUI:Notify({ Title = "Remote Triggered", Content = "RequestSell Fired!", Duration = 2 })
-        end
+        if Remotes.OpenRadarShop then pcall(function() Remotes.OpenRadarShop:FireServer() end) end
+        WindUI:Notify({ Title = "UI Remote", Content = "OpenRadarShop Fired!", Duration = 2 })
     end
 })
 
-print("❄️ Antartica Mining Hub (v4.0 Ultimate Edition) Berhasil Dimuat!")
+DevTab:Button({
+    Title = "⛏️ Trigger ShopState Pickaxes",
+    Desc = "Trigger ReplicatedStorage.ShopRemotes.ShopState",
+    Callback = function()
+        if Remotes.ShopState then pcall(function() Remotes.ShopState:FireServer(true) end) end
+        WindUI:Notify({ Title = "UI Remote", Content = "ShopState Fired!", Duration = 2 })
+    end
+})
+
+DevTab:Button({
+    Title = "⚡ Trigger UpgradeState",
+    Desc = "Trigger ReplicatedStorage.UpgradeRemotes.UpgradeState",
+    Callback = function()
+        if Remotes.UpgradeState then pcall(function() Remotes.UpgradeState:FireServer(true) end) end
+        WindUI:Notify({ Title = "UI Remote", Content = "UpgradeState Fired!", Duration = 2 })
+    end
+})
+
+print("❄️ Antartica Mining Hub (v4.2 Ultimate Edition) Berhasil Dimuat!")
 WindUI:Notify({
-    Title = "❄️ Antartica Hub v4.0 Active",
-    Content = "Integrasi 103 RemoteEvent & Player Target List Siap Digunakan!",
+    Title = "❄️ Antartica Hub v4.2 Active",
+    Content = "Gendong Player, Filter Kebun Plot, Power Boost 5k & Remote Open UI Siap!",
     Duration = 4
 })
