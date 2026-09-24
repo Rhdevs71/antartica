@@ -1,6 +1,6 @@
 --[[
     ===================================================================
-    ❄️ ANTARTICA HUB - MOUNTAIN MINING & UTILITY (v4.7 Verified Edition)
+    ❄️ ANTARTICA HUB - MOUNTAIN MINING & UTILITY (v4.8 Optimized Edition)
     ===================================================================
     UI Library: WindUI (https://github.com/Footagesus/WindUI)
     Dibuat untuk: Owner Game, Map Tester & Player (Roblox Mountain Mining)
@@ -9,8 +9,8 @@
       1. 🏃 Movement (Fly Toggle, D-Pad Toggle, Fly Speed, WalkSpeed, GodMode, Anti-Fall, Noclip)
       2. ⛏️ Mining & Dig (Auto Dig + Vector3 DigRequest, Maju Panjat Gunung AFK Step-by-Step)
       3. ⚡ Remote Hacks (Starfall, Meteor Event, Mountain Regen, Super Luck, Redeem Code)
-      4. 👥 Target Player (Player List Dropdown, Refresh List, TP to Target, Auto Follow/Spectate)
-      5. 🎒 Bag & Crystals (Auto Mine Termahal Liar, Filter Plot Strict, Instant Sell, Toggle Ambil Plot Wide, Stacker Spam)
+      4. 👥 Target Player (Player List, TP to Target, Auto Follow, Bring Player Test)
+      5. 🎒 Bag & Crystals (Auto Mine Termahal Liar, Rarity Magnet Filter, Instant Sell, Toggle Ambil Plot Wide, Stacker Spam)
       6. 📍 Teleports & Shops (TP & Buka UI Toko Jual, Bom, Pickaxe, Upgrade, Radar, Peak, CFrame Copy)
       7. ☀️ Map Inspector (TimeOfDay Slider 0-24, Fullbright, No Fog, Infinite Jump)
       8. 🔍 Dev Scanner (Scan Remotes ke File/Clipboard, Count Crystals, Open Shop UI Remote Test)
@@ -81,7 +81,7 @@ local function copyToRealClipboard(text)
     return copied
 end
 
-saveLocalFile("antartica_logs.txt", "=== Antartica Hub v4.7 Verified Edition Dijalankan ===", true)
+saveLocalFile("antartica_logs.txt", "=== Antartica Hub v4.8 Optimized Edition Dijalankan ===", true)
 
 -- ===================================================================
 -- LOAD WINDUI LIBRARY
@@ -137,7 +137,7 @@ local State = {
 
     -- Auto Mine & Gem Magnet
     AutoMineMostExpensive = false,
-    AutoPickupGem = true,
+    AutoPickupGem = false, -- Default OFF agar tidak menyedot kristal saat di-drop
     StrictPlotFilter = true,
     SelectedRarityFilter = "Semua (All)",
     CurrentBag = 0,
@@ -147,8 +147,8 @@ local State = {
     IsReturning = false,
     
     -- Plot Crystal Features
-    AutoTakePlotCrystals = false, -- Toggle ON/OFF Auto Ambil Plot
-    PlotWideRadius = 200,          -- Wide Radius untuk sedot kristal plot
+    AutoTakePlotCrystals = false,
+    PlotWideRadius = 200,
     
     -- Waypoints Toko Asli
     Waypoints = {
@@ -218,16 +218,9 @@ local function openShopUIByName(keywords, targetCFrame)
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if hrp then
-        for _, obj in ipairs(Workspace:GetDescendants()) do
+        for _, obj in ipairs(Workspace:GetChildren()) do
             if obj:IsA("ProximityPrompt") then
-                local part = obj.Parent
-                if part and part:IsA("BasePart") then
-                    if (part.Position - hrp.Position).Magnitude < 25 then
-                        if type(fireproximityprompt) == "function" then
-                            fireproximityprompt(obj)
-                        end
-                    end
-                end
+                pcall(function() fireproximityprompt(obj) end)
             end
         end
     end
@@ -255,7 +248,7 @@ local function openShopUIByName(keywords, targetCFrame)
 end
 
 -- ===================================================================
--- FUNGSI DETEKSI PLOT SENDIRI & MANAJEMEN KRISTAL PLOT (WIDE RADIUS & STACK)
+-- FUNGSI DETEKSI PLOT SENDIRI & MANAJEMEN KRISTAL PLOT (OPTIMIZED)
 -- ===================================================================
 local function getMyPlot()
     local plotsFolder = Workspace:FindFirstChild("Plots") or Workspace:FindFirstChild("Bases") or Workspace:FindFirstChild("Kebun")
@@ -314,7 +307,7 @@ local function isInsidePlot(obj)
     return false
 end
 
--- TOGGLE AUTO AMBIL KRISTAL PLOT (WIDE RADIUS CONTINUOUS LOOP)
+-- TOGGLE AUTO AMBIL KRISTAL PLOT (OPTIMIZED SCANNER)
 local function sweepAndTakePlotCrystals()
     if not State.AutoTakePlotCrystals then return end
     local char = LocalPlayer.Character
@@ -322,9 +315,9 @@ local function sweepAndTakePlotCrystals()
     if not hrp then return end
 
     local myPlot = getMyPlot()
-    local targetFolder = myPlot or Workspace
+    local targetFolder = myPlot or Workspace:FindFirstChild("Gems") or Workspace
 
-    for _, obj in ipairs(targetFolder:GetDescendants()) do
+    for _, obj in ipairs(targetFolder:GetChildren()) do
         if obj:IsA("ProximityPrompt") then
             local pPos = obj.Parent and obj.Parent:IsA("BasePart") and obj.Parent.Position
             if pPos and (pPos - hrp.Position).Magnitude <= State.PlotWideRadius then
@@ -347,14 +340,14 @@ task.spawn(function()
     while true do
         if State.AutoTakePlotCrystals then
             sweepAndTakePlotCrystals()
-            task.wait(0.3)
+            task.wait(0.6) -- Optimized cooldown untuk mencegah lag
         else
-            task.wait(1.0)
+            task.wait(1.2)
         end
     end
 end)
 
--- TUMPUK KRISTAL BAGUS SPAM DI POSISI DIRIDIRI KARAKTER SAAT INI
+-- TUMPUK KRISTAL BAGUS SPAM DI POSISI BERDIRI KARAKTER SAAT INI
 local function stackGoodCrystalsAtCurrentPosition(minRarityName)
     minRarityName = minRarityName or "Rare"
     local rarityRank = {
@@ -374,11 +367,10 @@ local function stackGoodCrystalsAtCurrentPosition(minRarityName)
         return 0
     end
 
-    -- Gunakan Titik Koordinat Berdiri Karakter Saat Ini!
     local currentStandPos = hrp.Position
-
     local itemsToPlace = {}
     local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
+    
     if bp then
         for _, item in ipairs(bp:GetChildren()) do
             local iName = item.Name:lower()
@@ -406,14 +398,13 @@ local function stackGoodCrystalsAtCurrentPosition(minRarityName)
 
     local placedCount = 0
     for index, data in ipairs(itemsToPlace) do
-        -- Tumpuk tepat di koordinat posisi berdiri karakter saat ini dengan offset Y bertingkat
         local stackPos = Vector3.new(currentStandPos.X, currentStandPos.Y + ((index - 1) * 0.35), currentStandPos.Z)
         if Remotes.PlaceCrystal then
             pcall(function()
                 Remotes.PlaceCrystal:FireServer(data.Id, stackPos)
             end)
             placedCount = placedCount + 1
-            task.wait(0.08)
+            task.wait(0.1)
         end
     end
 
@@ -444,7 +435,7 @@ local function getPlayerList()
 end
 
 -- ===================================================================
--- DETEKSI KAPASITAS RANSEL (BERDASARKAN TANGKAPAN LAYAR FOTO GAME)
+-- DETEKSI KAPASITAS RANSEL
 -- ===================================================================
 local function detectActualBagCount()
     local ls = LocalPlayer:FindFirstChild("leaderstats") or LocalPlayer:FindFirstChild("Stats") or LocalPlayer:FindFirstChild("Data")
@@ -465,7 +456,6 @@ local function detectActualBagCount()
         for _, lbl in ipairs(pg:GetDescendants()) do
             if lbl:IsA("TextLabel") and lbl.Visible and lbl.Text ~= "" then
                 local txt = lbl.Text:lower()
-                -- Format foto game: "45620.0 / 61267.0 kilogram" atau "Ransel Penuh"
                 if txt:find("penuh") or txt:find("full") then
                     State.CurrentBag = State.MaxBagCapacity
                     break
@@ -487,7 +477,7 @@ local function detectActualBagCount()
 end
 
 -- ===================================================================
--- DIG ENGINE TERPERBARUI (PAYLOAD VECTOR3 DIGREQUEST DENGAN SIMPLESPY)
+-- DIG ENGINE TERPERBARUI (PAYLOAD VECTOR3 DIGREQUEST & SMOOTH ADVANCE)
 -- ===================================================================
 local function triggerDigAction()
     local char = LocalPlayer.Character
@@ -495,14 +485,12 @@ local function triggerDigAction()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not hrp then return end
 
-    -- Hitung Target Vector3 di Depan Karakter Sesuai Payload SimpleSpy: DigRequest:FireServer(Vector3.new(...))
     local lookDir = Camera.CFrame.LookVector
     local flatDir = Vector3.new(lookDir.X, 0, lookDir.Z).Unit
     if flatDir.Magnitude < 0.1 then flatDir = hrp.CFrame.LookVector end
 
     local targetDigVector = hrp.Position + (flatDir * State.DigVectorDistance)
 
-    -- Panggil Remote DigRequest dengan Argumen Vector3 Presisi
     if Remotes.DigRequest then
         pcall(function() Remotes.DigRequest:FireServer(targetDigVector) end)
     end
@@ -510,10 +498,9 @@ local function triggerDigAction()
         pcall(function() Remotes.MineHit:FireServer() end)
     end
 
-    -- Memicu Tombol Dig pada PlayerGui jika ada
     local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
     if pg then
-        for _, obj in ipairs(pg:GetDescendants()) do
+        for _, obj in ipairs(pg:GetChildren()) do
             if (obj:IsA("TextButton") or obj:IsA("ImageButton")) and obj.Visible then
                 local text = (obj:IsA("TextButton") and obj.Text) or ""
                 local name = obj.Name:lower()
@@ -530,14 +517,15 @@ local function triggerDigAction()
         end
     end
 
-    -- Memicu Tool jika Dipegang
     if char then
         local tool = char:FindFirstChildOfClass("Tool")
         if tool then tool:Activate() end
     end
 
-    -- LOGIC MAJU & PANJAT GUNUNG AFK (TERRAIN CARVER STEP-BY-STEP)
+    -- LOGIC MAJU & PANJAT GUNUNG AFK SMOOTH (SMOOTH TERRAIN advance)
     if State.AutoAdvanceMountain and State.AutoDig and hrp and hum then
+        hum:Move(flatDir, false)
+        local stepUp = 0.2
         local rayOrigin = hrp.Position
         local rayDirection = flatDir * 3.5
         local raycastParams = RaycastParams.new()
@@ -545,13 +533,11 @@ local function triggerDigAction()
         raycastParams.FilterType = Enum.RaycastFilterType.Exclude
 
         local result = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-        local stepUp = 0.15
         if result then
-            stepUp = 0.45
+            stepUp = 0.5
             hum.Jump = true
         end
 
-        -- Gerakkan Karakter Maju Step-by-Step ke Lereng Gunung
         hrp.CFrame = hrp.CFrame + (flatDir * State.CarveSpeed) + Vector3.new(0, stepUp, 0)
     end
 
@@ -569,7 +555,7 @@ task.spawn(function()
     while true do
         if State.AutoDig then
             triggerDigAction()
-            task.wait(0.05)
+            task.wait(0.08)
         else
             task.wait(0.3)
         end
@@ -581,7 +567,8 @@ end)
 -- ===================================================================
 local function findCrystalsInMap()
     local list = {}
-    for _, obj in ipairs(Workspace:GetDescendants()) do
+    local gemsContainer = Workspace:FindFirstChild("Gems") or Workspace:FindFirstChild("Crystals") or Workspace
+    for _, obj in ipairs(gemsContainer:GetChildren()) do
         if not isInsidePlot(obj) then
             local n = obj.Name:lower()
             if (obj:IsA("BasePart") or obj:IsA("Model")) and 
@@ -606,7 +593,7 @@ local function findCrystalsInMap()
 end
 
 -- ===================================================================
--- AUTO PICKUP & MAGNET GEM
+-- AUTO PICKUP & MAGNET GEM DENGAN RARITY FILTER & STRICT TOGGLE
 -- ===================================================================
 local function autoPickupGemLoop()
     if not State.AutoPickupGem then return end
@@ -614,20 +601,42 @@ local function autoPickupGemLoop()
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if not isInsidePlot(obj) then
+    local rarityRank = {
+        ["Mythic"] = 6,
+        ["Legendary"] = 5,
+        ["Epic"] = 4,
+        ["Rare"] = 3,
+        ["Uncommon"] = 2,
+        ["Common"] = 1,
+        ["Semua (All)"] = 0
+    }
+    local filterMinRank = rarityRank[State.SelectedRarityFilter] or 0
+
+    local targetContainer = Workspace:FindFirstChild("Gems") or Workspace:FindFirstChild("Drops") or Workspace
+    for _, obj in ipairs(targetContainer:GetChildren()) do
+        if State.AutoPickupGem and not isInsidePlot(obj) then
             local n = obj.Name:lower()
             if n:find("gem") or n:find("crystal") or n:find("drop") then
                 if obj:IsA("BasePart") or obj:IsA("Model") then
                     local pos = obj:IsA("Model") and obj:GetPivot().Position or obj.Position
                     local dist = (hrp.Position - pos).Magnitude
                     if dist < 60 then
-                        if Remotes.PickupGem then pcall(function() Remotes.PickupGem:FireServer(obj) end) end
-                        if Remotes.GemCollected then pcall(function() Remotes.GemCollected:FireServer(obj) end) end
+                        local itemRarityRank = 1
+                        for rName, rData in pairs(State.RarityConfig) do
+                            if n:find(rName:lower()) then
+                                itemRarityRank = rData.Priority
+                                break
+                            end
+                        end
 
-                        local prompt = obj:FindFirstChildOfClass("ProximityPrompt", true)
-                        if prompt and type(fireproximityprompt) == "function" then
-                            fireproximityprompt(prompt)
+                        if itemRarityRank >= filterMinRank then
+                            if Remotes.PickupGem then pcall(function() Remotes.PickupGem:FireServer(obj) end) end
+                            if Remotes.GemCollected then pcall(function() Remotes.GemCollected:FireServer(obj) end) end
+
+                            local prompt = obj:FindFirstChildOfClass("ProximityPrompt", true)
+                            if prompt and type(fireproximityprompt) == "function" then
+                                fireproximityprompt(prompt)
+                            end
                         end
                     end
                 end
@@ -681,7 +690,9 @@ end
 task.spawn(function()
     while true do
         detectActualBagCount()
-        autoPickupGemLoop()
+        if State.AutoPickupGem then
+            autoPickupGemLoop()
+        end
 
         if State.AutoReturnWhenFull and not State.IsReturning then
             if State.CurrentBag > 0 and State.CurrentBag >= State.MaxBagCapacity then
@@ -702,12 +713,12 @@ task.spawn(function()
                 triggerDigAction()
             end
         end
-        task.wait(0.3)
+        task.wait(0.5) -- Optimized yield interval
     end
 end)
 
 -- ===================================================================
--- PLAYER TARGET & FOLLOW LOOP
+-- PLAYER TARGET & FOLLOW & EXPERIMENTAL BRING PLAYER LOOP
 -- ===================================================================
 task.spawn(function()
     while true do
@@ -943,7 +954,7 @@ end)
 -- MEMBUAT WINDOW DAN 8 TABS LENGKAP DENGAN WINDUI
 -- ===================================================================
 local Window = WindUI:CreateWindow({
-    Title = "❄️ Antartica Mining Hub (v4.7)",
+    Title = "❄️ Antartica Mining Hub (v4.8)",
     Icon = "mountain",
     Author = "by Rhdevs",
     Folder = "AntarticaHub",
@@ -1035,7 +1046,7 @@ AutoTab:Slider({
     Callback = function(val) State.CarveSpeed = val end
 })
 
--- TAB 3: REMOTE HACKS & UTILITIES (EVENT CLEANUP)
+-- TAB 3: REMOTE HACKS & UTILITIES
 local RemoteTab = Window:Tab({ Title = "Remote Hacks", Icon = "cpu" })
 
 RemoteTab:Button({
@@ -1151,6 +1162,28 @@ PlayerTab:Button({
     end
 })
 
+PlayerTab:Button({
+    Title = "🧲 Bring Player Target (Test Client POV)",
+    Desc = "Mencoba membawa player target ke posisi Anda (Tampak di Client POV)",
+    Callback = function()
+        if State.SelectedPlayerName then
+            local targetP = Players:FindFirstChild(State.SelectedPlayerName)
+            local char = LocalPlayer.Character
+            local myHrp = char and char:FindFirstChild("HumanoidRootPart")
+            if targetP and targetP.Character and targetP.Character:FindFirstChild("HumanoidRootPart") and myHrp then
+                pcall(function()
+                    targetP.Character.HumanoidRootPart.CFrame = myHrp.CFrame + Vector3.new(0, 0, 3)
+                end)
+                WindUI:Notify({ 
+                    Title = "🧲 Bring Test (Client POV)", 
+                    Content = "Player " .. State.SelectedPlayerName .. " dipindah di Client POV (Catatan: Server Roblox FE membatasi tampilan ke layar player lain).", 
+                    Duration = 4 
+                })
+            end
+        end
+    end
+})
+
 PlayerTab:Toggle({
     Title = "🔄 Auto Follow / Spectate Player",
     Desc = "Melayang & mengikuti pergerakan player target",
@@ -1191,9 +1224,17 @@ BagTab:Toggle({
 
 BagTab:Toggle({
     Title = "🧲 Auto Ambil / Magnet Gem",
-    Desc = "Otomatis menyedot gem jatuh di sekitar tanpa perlu disentuh",
-    Default = true,
+    Desc = "Otomatis menyedot gem jatuh di sekitar (Menghormati Rarity Filter & Cooldown Drop)",
+    Default = false,
     Callback = function(state) State.AutoPickupGem = state end
+})
+
+BagTab:Dropdown({
+    Title = "Filter Kelangkaan Magnet (Rarity Filter)",
+    Desc = "Pilih level kristal minimal yang disedot oleh Magnet Gem",
+    Values = { "Semua (All)", "Uncommon+", "Rare+", "Epic+", "Legendary+", "Mythic" },
+    Default = "Semua (All)",
+    Callback = function(val) State.SelectedRarityFilter = val end
 })
 
 BagTab:Toggle({
@@ -1393,9 +1434,9 @@ DevTab:Button({
     end
 })
 
-print("❄️ Antartica Mining Hub (v4.7 Verified Edition) Berhasil Dimuat!")
+print("❄️ Antartica Mining Hub (v4.8 Optimized & Bring Test Edition) Berhasil Dimuat!")
 WindUI:Notify({
-    Title = "❄️ Antartica Hub v4.7 Active",
-    Content = "6 Poin Revisi ACC Ready (Dig Vector3, Wide Plot Toggle, Stacker Spam, Sell All)!",
+    Title = "❄️ Antartica Hub v4.8 Active",
+    Content = "Bug Lag Fixed + Rarity Magnet Filter + Current Stand Stacker + Bring Test Ready!",
     Duration = 4
 })
