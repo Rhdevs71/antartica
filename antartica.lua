@@ -1,16 +1,16 @@
 --[[
     ===================================================================
-    ❄️ ANTARTICA HUB - MOUNTAIN MINING & UTILITY (v4.9 Stability Release)
+    ❄️ ANTARTICA HUB - MOUNTAIN MINING & UTILITY (v5.0 Sultan Sniper & Excavation Release)
     ===================================================================
     UI Library: WindUI (https://github.com/Footagesus/WindUI)
     Dibuat untuk: Owner Game, Map Tester & Player (Roblox Mountain Mining)
     
     Kelengkapan Tab WindUI (8 Tabs Lengkap):
       1. 🏃 Movement (Fly Toggle, D-Pad Toggle, Fly Speed, WalkSpeed, GodMode, Anti-Fall, Noclip)
-      2. ⛏️ Mining & Dig (Auto Dig + Vector3 DigRequest, Surface Snapping Terrain Carver)
+      2. ⛏️ Mining & Dig (Auto Dig + Vector3 DigRequest, Surface Snapping Terrain Carver, Auto-Clear Dirt)
       3. ⚡ Remote Hacks (Starfall, Meteor Event, Mountain Regen, Super Luck, Redeem Code)
       4. 👥 Target Player (Player List, TP to Target, Auto Follow, Bring Player Test)
-      5. 🎒 Bag & Crystals (Auto Mine Termahal, Rarity Magnet Filter, Anti-Drop Cooldown, Plot Stacker)
+      5. 🎒 Bag & Crystals (Global Sultan Sniper $1k-$1Qa, Size & Luck Filter, Equip-Drop Plot Stacker)
       6. 📍 Teleports & Shops (TP & Buka UI Toko Jual, Bom, Pickaxe, Upgrade, Radar, Peak, CFrame Copy)
       7. ☀️ Map Inspector (TimeOfDay Slider 0-24, Fullbright, No Fog, Infinite Jump)
       8. 🔍 Dev Scanner (Scan Remotes ke File/Clipboard, Count Crystals, Open Shop UI Remote Test)
@@ -145,6 +145,17 @@ local State = {
     AutoReturnWhenFull = true,
     InstantRemoteSell = true,
     IsReturning = false,
+
+    -- Global Crystal Sniper ($1K - $1Qa, Size, Luck)
+    AutoSnipeGlobal = false,
+    SnipeMinPrice = 0,
+    SnipeMinPriceDisplay = "Semua ($0+)",
+    SnipeMinSizeRank = 1,
+    SnipeMinSizeDisplay = "Semua Ukuran",
+    SnipeMinLuck = 0,
+    SnipeMinLuckDisplay = "Semua Luck (0%+)",
+    AutoClearDirtRadius = 15,
+    IsSniping = false,
     
     -- Anti-Self Drop & Plot Crystal Features
     LastSelfDropTick = 0,
@@ -368,88 +379,96 @@ task.spawn(function()
     end
 end)
 
--- TUMPUK KRISTAL BAGUS SPAM DI POSISI BERDIRI KARAKTER SAAT INI (MULTI-SOURCE)
-local function stackGoodCrystalsAtCurrentPosition(minRarityName)
-    minRarityName = minRarityName or "Rare"
-    local rarityRank = {
-        ["Mythic"] = 6,
-        ["Legendary"] = 5,
-        ["Epic"] = 4,
-        ["Rare"] = 3,
-        ["Uncommon"] = 2,
-        ["Common"] = 1
-    }
-    local minRank = rarityRank[minRarityName] or 3
-
+-- ===================================================================
+-- TUMPUK KRISTAL DI PLOT: EQUIP-THEN-DROP (SESUAI MEKANISME GAME)
+-- ===================================================================
+local function stackGoodCrystalsAtCurrentPosition()
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then
         WindUI:Notify({ Title = "⚠️ Karakter Tidak Ada", Content = "Pastikan karakter aktif saat menumpuk kristal!", Duration = 3 })
         return 0
     end
 
+    local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
     local currentStandPos = hrp.Position
     local itemsToPlace = {}
 
-    -- 1. Cek Tool yang sedang dipegang di tangan
+    -- Simpan referensi pickaxe/alat tambang asli agar bisa di-equip kembali
+    local originalPickaxe = nil
     local heldTool = char:FindFirstChildOfClass("Tool")
     if heldTool then
-        local cId = heldTool:GetAttribute("Id") or heldTool:GetAttribute("CrystalId") or tonumber(heldTool.Name:match("%d+"))
-        if cId then
-            table.insert(itemsToPlace, { Id = cId, Rank = 6 })
+        local hName = heldTool.Name:lower()
+        if hName:find("pick") or hName:find("inti") or hName:find("beliung") or hName:find("drill") then
+            originalPickaxe = heldTool
+        else
+            table.insert(itemsToPlace, heldTool)
         end
     end
 
-    -- 2. Cek Backpack
-    local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
+    -- Pindai seluruh tool kristal di Backpack
     if bp then
         for _, item in ipairs(bp:GetChildren()) do
-            local iName = item.Name:lower()
-            local rRank = 1
-            for rName, rVal in pairs(State.RarityConfig) do
-                if iName:find(rName:lower()) then
-                    rRank = rVal.Priority
-                    break
-                end
-            end
-
-            local itemLuck = item:GetAttribute("Luck") or item:GetAttribute("Rarity")
-            if type(itemLuck) == "number" and itemLuck > 10 then
-                rRank = math.max(rRank, 4)
-            end
-
-            if rRank >= minRank then
-                local crystalId = item:GetAttribute("Id") or item:GetAttribute("CrystalId") or tonumber(item.Name:match("%d+")) or tonumber(item.Name)
-                if crystalId then
-                    table.insert(itemsToPlace, { Id = crystalId, Rank = rRank })
+            if item:IsA("Tool") then
+                local iName = item.Name:lower()
+                -- Kristal di game ini dinamai berdasarkan bobot kg (misal "124 kilogram", "612 kilogram") atau kata crystal
+                if iName:find("kilo") or iName:find("kg") or iName:find("crystal") or iName:find("kristal") or iName:find("gem") or item:GetAttribute("Weight") or item:GetAttribute("Id") then
+                    table.insert(itemsToPlace, item)
+                elseif not originalPickaxe and (iName:find("pick") or iName:find("inti") or iName:find("beliung") or iName:find("drill")) then
+                    originalPickaxe = item
                 end
             end
         end
     end
 
-    -- 3. Fallback: Jika tidak terdeteksi via tool, gunakan ManualCrystalId yang dikonfigurasi
+    -- Sortir: Kristal dengan bobot (KG) terbesar atau Luck tertinggi didahulukan
+    table.sort(itemsToPlace, function(a, b)
+        local wA = tonumber(a.Name:match("([%d%.]+)")) or a:GetAttribute("Weight") or 0
+        local wB = tonumber(b.Name:match("([%d%.]+)")) or b:GetAttribute("Weight") or 0
+        return wA > wB
+    end)
+
     if #itemsToPlace == 0 and State.ManualCrystalId and State.ManualCrystalId > 0 then
-        table.insert(itemsToPlace, { Id = State.ManualCrystalId, Rank = 5 })
+        -- Fallback manual jika di tas tidak ada item tool kristal
+        local stackPos = Vector3.new(currentStandPos.X, currentStandPos.Y + 0.5, currentStandPos.Z)
+        if Remotes.PlaceCrystal then
+            pcall(function() Remotes.PlaceCrystal:FireServer(State.ManualCrystalId, stackPos) end)
+        end
+        return 1
     end
 
     if #itemsToPlace == 0 then
-        WindUI:Notify({ Title = "⚠️ Kristal Kosong", Content = "Tidak ada kristal ber-ID terdeteksi di tangan atau tas!", Duration = 3 })
+        WindUI:Notify({ Title = "⚠️ Kristal Kosong", Content = "Tidak ada kristal terdeteksi di tas (contoh: 124 kilogram)!", Duration = 3 })
         return 0
     end
 
-    table.sort(itemsToPlace, function(a, b) return a.Rank > b.Rank end)
-
     local placedCount = 0
-    for index, data in ipairs(itemsToPlace) do
-        -- Tumpuk di koordinat berdiri karakter saat ini dengan offset tinggi Y bertingkat
-        local stackPos = Vector3.new(currentStandPos.X, currentStandPos.Y + ((index - 1) * 0.35), currentStandPos.Z)
-        if Remotes.PlaceCrystal then
-            pcall(function()
-                Remotes.PlaceCrystal:FireServer(data.Id, stackPos)
-            end)
-            placedCount = placedCount + 1
-            task.wait(0.1)
+    for index, tool in ipairs(itemsToPlace) do
+        -- 1. WAJIB PEGANG (EQUIP) KRISTAL KE TANGAN SEBELUM DROP/PLACE KE PLOT
+        if tool.Parent == bp then
+            hum:EquipTool(tool)
+            task.wait(0.18)
         end
+
+        local crystalId = tool:GetAttribute("Id") or tool:GetAttribute("CrystalId") or tonumber(tool.Name:match("%d+")) or State.ManualCrystalId or 2481
+        local stackPos = Vector3.new(currentStandPos.X, currentStandPos.Y + ((index - 1) * 0.35), currentStandPos.Z)
+
+        -- 2. Pemicu Place & Drop ke Plot
+        if Remotes.PlaceCrystal then
+            pcall(function() Remotes.PlaceCrystal:FireServer(crystalId, stackPos) end)
+        end
+        if Remotes.DropCrystal then
+            pcall(function() Remotes.DropCrystal:FireServer(crystalId) end)
+        end
+
+        placedCount = placedCount + 1
+        task.wait(0.12)
+    end
+
+    -- 3. Kembalikan pegangan ke Pickaxe Tambang Utama
+    if originalPickaxe and originalPickaxe.Parent == bp then
+        hum:EquipTool(originalPickaxe)
     end
 
     return placedCount
@@ -513,7 +532,280 @@ local function detectActualBagCount()
 end
 
 -- ===================================================================
--- DIG ENGINE DENGAN SURFACE SNAPPING TERRAIN CARVER (BEBAS NOCLIP VOID)
+-- ===================================================================
+-- SISTEM PEMBERSIH TANAH & DETEKSI KRISTAL TERTIMBUN (AUTO-CLEAR DIRT)
+-- ===================================================================
+local function clearDirtAroundPosition(targetPos, repeatCount)
+    repeatCount = repeatCount or 3
+    if not Remotes.DigRequest then return end
+
+    local offsets = {
+        Vector3.new(0, 0, 0),
+        Vector3.new(0, -1.2, 0),
+        Vector3.new(0, 1.2, 0),
+        Vector3.new(1.2, 0, 0),
+        Vector3.new(-1.2, 0, 0),
+        Vector3.new(0, 0, 1.2),
+        Vector3.new(0, 0, -1.2)
+    }
+
+    for i = 1, math.min(repeatCount, #offsets) do
+        local digVector = targetPos + offsets[i]
+        pcall(function() Remotes.DigRequest:FireServer(digVector) end)
+        if Remotes.MineHit then pcall(function() Remotes.MineHit:FireServer() end) end
+        task.wait(0.04)
+    end
+end
+
+-- ===================================================================
+-- PARSER HARGA BER-SUFFIX ($1K s/d $1Qa), UKURAN & KEBERUNTUNGAN (LUCK)
+-- ===================================================================
+local priceSuffixes = {
+    ["k"]  = 1e3,
+    ["m"]  = 1e6,
+    ["b"]  = 1e9,
+    ["t"]  = 1e12,
+    ["qa"] = 1e15,
+    ["qi"] = 1e18,
+    ["sx"] = 1e21,
+    ["sp"] = 1e24,
+    ["oc"] = 1e27,
+    ["no"] = 1e30,
+    ["dc"] = 1e33
+}
+
+local function parseNumberWithSuffix(str)
+    if not str then return 0, "$0" end
+    local clean = tostring(str):gsub("[%,%$%s]", ""):lower()
+    local numStr, sufStr = clean:match("([%d%.]+)%s*([a-z]*)")
+    if not numStr then return 0, tostring(str) end
+    local val = tonumber(numStr) or 0
+    if sufStr and priceSuffixes[sufStr] then
+        val = val * priceSuffixes[sufStr]
+    end
+    return val, tostring(str)
+end
+
+local sizeRanks = {
+    ["tiny"]     = 1,
+    ["kecil"]    = 1,
+    ["small"]    = 2,
+    ["medium"]   = 3,
+    ["normal"]   = 3,
+    ["sedang"]   = 3,
+    ["large"]    = 4,
+    ["besar"]    = 4,
+    ["huge"]     = 5,
+    ["giant"]    = 5,
+    ["raksasa"]  = 5,
+    ["colossal"] = 6,
+    ["kolosus"]  = 6,
+    ["massive"]  = 6,
+    ["titan"]    = 7,
+    ["godly"]    = 7,
+    ["mythic"]   = 7
+}
+
+local function parseSizeRank(str)
+    if not str then return 1, "Normal" end
+    local s = tostring(str):lower()
+    for name, rank in pairs(sizeRanks) do
+        if s:find(name) then
+            return rank, name:upper()
+        end
+    end
+    return 1, "Normal"
+end
+
+local function parseLuck(str)
+    if not str then return 0 end
+    local clean = tostring(str)
+    local lStr = clean:match("[Kk]eberuntungan:%s*%+?([%d%.]+)") or clean:match("%+([%d%.]+)%%")
+    if lStr then
+        return tonumber(lStr) or 0
+    end
+    return 0
+end
+
+local function isCrystalCandidate(obj)
+    if not obj or obj == Workspace.Terrain then return false end
+    local n = obj.Name:lower()
+    if n:find("crystal") or n:find("kristal") or n:find("gem") or n:find("ore") or n:find("sundial") or n:find("heart") or n:find("batu") or n:find("drop") then
+        return true
+    end
+
+    local prompt = obj:FindFirstChildOfClass("ProximityPrompt", true)
+    if prompt then
+        local act = prompt.ActionText:lower()
+        local objT = prompt.ObjectText:lower()
+        if act:find("ambil") or act:find("take") or act:find("pick") or objT:find("$") or objT:find("kg") then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function extractCrystalInfo(obj)
+    if not obj then return nil end
+    local cf = obj:IsA("Model") and obj:GetPivot() or (obj:IsA("BasePart") and obj.CFrame)
+    if not cf then return nil end
+
+    local prompt = obj:IsA("ProximityPrompt") and obj or obj:FindFirstChildOfClass("ProximityPrompt", true)
+    local fullText = ""
+    local objText = ""
+    local actionText = ""
+
+    if prompt then
+        objText = prompt.ObjectText or ""
+        actionText = prompt.ActionText or ""
+        fullText = objText .. " " .. actionText .. " " .. obj.Name
+    else
+        fullText = obj.Name
+    end
+
+    for _, gui in ipairs(obj:GetChildren()) do
+        if gui:IsA("BillboardGui") or gui:IsA("SurfaceGui") then
+            for _, lbl in ipairs(gui:GetDescendants()) do
+                if lbl:IsA("TextLabel") and lbl.Text ~= "" then
+                    fullText = fullText .. " " .. lbl.Text
+                end
+            end
+        end
+    end
+
+    -- Ekstrak Harga ($)
+    local priceVal = 0
+    local priceDisplay = "$0"
+    local rawPrice = fullText:match("%$([%d%.,%a]+)")
+    if rawPrice then
+        priceVal, priceDisplay = parseNumberWithSuffix(rawPrice)
+        priceDisplay = "$" .. rawPrice
+    else
+        local attrPrice = obj:GetAttribute("Price") or obj:GetAttribute("Harga") or obj:GetAttribute("Value")
+        if attrPrice then
+            priceVal, priceDisplay = parseNumberWithSuffix(attrPrice)
+        end
+    end
+
+    -- Ekstrak Ukuran (Size)
+    local sizeTag = fullText:match("%[([%w%s]+)%]") or ""
+    local sizeRank, sizeName = parseSizeRank(sizeTag ~= "" and sizeTag or fullText)
+
+    -- Ekstrak Berat (Weight KG)
+    local weightVal = 0
+    local rawWeight = fullText:match("([%d%.]+)%s*[Kk][Gg]") or fullText:match("([%d%.]+)%s*kilo")
+    if rawWeight then
+        weightVal = tonumber(rawWeight) or 0
+    else
+        local attrW = obj:GetAttribute("Weight") or obj:GetAttribute("Berat")
+        if attrW then weightVal = tonumber(attrW) or 0 end
+    end
+
+    -- Ekstrak Keberuntungan (Luck %)
+    local luckVal = parseLuck(fullText)
+    if luckVal == 0 then
+        local attrL = obj:GetAttribute("Luck") or obj:GetAttribute("Keberuntungan")
+        if attrL then luckVal = tonumber(attrL) or 0 end
+    end
+
+    -- Nama Tampilan
+    local displayName = obj.Name
+    if objText ~= "" then
+        displayName = objText:match("%[%w+%]%s*(.-)%s*•") or objText
+    end
+
+    return {
+        Instance = obj,
+        Prompt = prompt,
+        CFrame = cf,
+        Position = cf.Position,
+        Name = displayName,
+        FullText = fullText,
+        Price = priceVal,
+        PriceDisplay = priceDisplay,
+        SizeRank = sizeRank,
+        SizeName = sizeName,
+        Weight = weightVal,
+        Luck = luckVal
+    }
+end
+
+-- ===================================================================
+-- PENCARIAN KRISTAL GLOBAL MAP (EXCLUDE PLOT & EXCLUDE DROP SENDIRI)
+-- ===================================================================
+local function findCrystalsInMap()
+    local list = {}
+    local searched = {}
+
+    local containers = {
+        Workspace:FindFirstChild("Gems"),
+        Workspace:FindFirstChild("Crystals"),
+        Workspace:FindFirstChild("Drops"),
+        Workspace:FindFirstChild("Debris"),
+        Workspace
+    }
+
+    for _, container in ipairs(containers) do
+        if container then
+            for _, obj in ipairs(container:GetChildren()) do
+                if not searched[obj] and (obj:IsA("Model") or obj:IsA("BasePart")) then
+                    searched[obj] = true
+
+                    if not (State.DroppedGemsCooldown[obj] and (tick() - State.DroppedGemsCooldown[obj] < 8)) then
+                        if not isInsidePlot(obj) then
+                            if isCrystalCandidate(obj) then
+                                local info = extractCrystalInfo(obj)
+                                if info then
+                                    table.insert(list, info)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Sortir: Harga Dolar ($) Tertinggi > Keberuntungan (Luck) > Ukuran
+    table.sort(list, function(a, b)
+        if a.Price ~= b.Price then
+            return a.Price > b.Price
+        elseif a.Luck ~= b.Luck then
+            return a.Luck > b.Luck
+        else
+            return a.SizeRank > b.SizeRank
+        end
+    end)
+
+    return list
+end
+
+-- ===================================================================
+-- SCAN & TAMPILKAN KRISTAL TERMAHAL DI MAP (NOTIFIKASI WINDUI)
+-- ===================================================================
+local function scanAndShowTopCrystal()
+    local crystals = findCrystalsInMap()
+    if #crystals == 0 then
+        WindUI:Notify({
+            Title = "🔍 Scan Map",
+            Content = "Belum ada kristal liar yang terdeteksi di permukaan gunung (semua di plot atau belum digali).",
+            Duration = 3
+        })
+        return
+    end
+
+    local top = crystals[1]
+    WindUI:Notify({
+        Title = "💎 Kristal Termahal di Map!",
+        Content = string.format("Nama: %s\nHarga: %s\nUkuran: %s\nBobot: %.1f KG\nLuck: +%.1f%%",
+            top.Name, top.PriceDisplay, top.SizeName, top.Weight, top.Luck),
+        Duration = 5
+    })
+end
+
+-- ===================================================================
+-- DIG ENGINE AFK DENGAN DETEKSI TERTIMBUN & SURFACE SNAPPING
 -- ===================================================================
 local function triggerDigAction()
     local char = LocalPlayer.Character
@@ -525,41 +817,67 @@ local function triggerDigAction()
     local flatDir = Vector3.new(lookDir.X, 0, lookDir.Z).Unit
     if flatDir.Magnitude < 0.1 then flatDir = hrp.CFrame.LookVector end
 
-    local targetDigVector = hrp.Position + (flatDir * State.DigVectorDistance)
-
-    -- 1. Panggil Remote DigRequest dengan Target Vector3 Presisi
-    if Remotes.DigRequest then
-        pcall(function() Remotes.DigRequest:FireServer(targetDigVector) end)
+    -- 1. DETEKSI KRISTAL TERTIMBUN DI DEKAT PEMAIN (RADIUS 25 STUD)
+    local nearbyBuried = nil
+    local minDist = 25
+    local candidates = Workspace:FindFirstChild("Gems") or Workspace:FindFirstChild("Crystals") or Workspace
+    for _, obj in ipairs(candidates:GetChildren()) do
+        if not isInsidePlot(obj) and isCrystalCandidate(obj) then
+            local pos = obj:IsA("Model") and obj:GetPivot().Position or (obj:IsA("BasePart") and obj.Position)
+            if pos then
+                local dist = (pos - hrp.Position).Magnitude
+                if dist < minDist then
+                    minDist = dist
+                    nearbyBuried = { obj = obj, pos = pos }
+                end
+            end
+        end
     end
-    if Remotes.MineHit then
-        pcall(function() Remotes.MineHit:FireServer() end)
-    end
 
-    -- 2. Pemicu Tool jika dipegang
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool then tool:Activate() end
+    if nearbyBuried then
+        -- Kristal tertimbun terdeteksi: Jeda langkah & sembur DigRequest untuk membersihkan tanahnya!
+        hum:Move(Vector3.zero, false)
+        clearDirtAroundPosition(nearbyBuried.pos, 3)
 
-    -- 3. PERGERAKAN MAJU & PANJAT GUNUNG AFK: SURFACE SNAPPING (ANTI JATUH KE VOID)
-    if State.AutoAdvanceMountain and State.AutoDig then
-        hum:Move(flatDir, false)
+        local prompt = nearbyBuried.obj:FindFirstChildOfClass("ProximityPrompt", true)
+        if prompt and type(fireproximityprompt) == "function" then
+            pcall(function() fireproximityprompt(prompt) end)
+        end
+        if Remotes.PickupGem then pcall(function() Remotes.PickupGem:FireServer(nearbyBuried.obj) end) end
+        if Remotes.GemCollected then pcall(function() Remotes.GemCollected:FireServer(nearbyBuried.obj) end) end
+        task.wait(0.08)
+    else
+        -- 2. PENGGALIAN NORMAL KE DEPAN LERENG GUNUNG
+        local targetDigVector = hrp.Position + (flatDir * State.DigVectorDistance)
+        if Remotes.DigRequest then
+            pcall(function() Remotes.DigRequest:FireServer(targetDigVector) end)
+        end
+        if Remotes.MineHit then
+            pcall(function() Remotes.MineHit:FireServer() end)
+        end
 
-        -- Tembakkan Raycast dari 3 studs di atas titik langkah ke bawah tanah
-        local stepAheadPos = hrp.Position + (flatDir * State.CarveSpeed) + Vector3.new(0, 3, 0)
-        local downParams = RaycastParams.new()
-        downParams.FilterAncestorsInstances = { char }
-        downParams.FilterType = Enum.RaycastFilterType.Exclude
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool then tool:Activate() end
 
-        local groundHit = Workspace:Raycast(stepAheadPos, Vector3.new(0, -12, 0), downParams)
-        if groundHit then
-            -- Tempatkan kaki karakter tepat di atas permukaan tanah lereng gunung
-            local surfaceY = groundHit.Position.Y + 3.0
-            local targetPos = Vector3.new(stepAheadPos.X, surfaceY, stepAheadPos.Z)
-            hrp.CFrame = CFrame.new(targetPos, targetPos + flatDir)
-        else
-            -- Cek apakah ada dinding tebing di depan untuk melompat
-            local forwardHit = Workspace:Raycast(hrp.Position, flatDir * 3.5, downParams)
-            if forwardHit then
-                hum.Jump = true
+        -- 3. PERGERAKAN MAJU & PANJAT GUNUNG AFK: SURFACE SNAPPING (ANTI JATUH KE VOID)
+        if State.AutoAdvanceMountain and State.AutoDig then
+            hum:Move(flatDir, false)
+
+            local stepAheadPos = hrp.Position + (flatDir * State.CarveSpeed) + Vector3.new(0, 3, 0)
+            local downParams = RaycastParams.new()
+            downParams.FilterAncestorsInstances = { char }
+            downParams.FilterType = Enum.RaycastFilterType.Exclude
+
+            local groundHit = Workspace:Raycast(stepAheadPos, Vector3.new(0, -12, 0), downParams)
+            if groundHit then
+                local surfaceY = groundHit.Position.Y + 3.0
+                local targetPos = Vector3.new(stepAheadPos.X, surfaceY, stepAheadPos.Z)
+                hrp.CFrame = CFrame.new(targetPos, targetPos + flatDir)
+            else
+                local forwardHit = Workspace:Raycast(hrp.Position, flatDir * 3.5, downParams)
+                if forwardHit then
+                    hum.Jump = true
+                end
             end
         end
     end
@@ -586,36 +904,52 @@ task.spawn(function()
 end)
 
 -- ===================================================================
--- PENCARIAN & TELEPORT KRISTAL TERMAHAL LIAR (EXCLUDE PLOT & EXCLUDE DROP)
+-- GLOBAL CRYSTAL SNIPER (AMBIL KRISTAL MEWAH DI SELURUH MAP)
 -- ===================================================================
-local function findCrystalsInMap()
-    local list = {}
-    local gemsContainer = Workspace:FindFirstChild("Gems") or Workspace:FindFirstChild("Crystals") or Workspace
-    for _, obj in ipairs(gemsContainer:GetChildren()) do
-        -- Abaikan jika objek baru saja didrop sendiri
-        if not (State.DroppedGemsCooldown[obj] and (tick() - State.DroppedGemsCooldown[obj] < 8)) then
-            if not isInsidePlot(obj) then
-                local n = obj.Name:lower()
-                if (obj:IsA("BasePart") or obj:IsA("Model")) and 
-                   (n:find("crystal") or n:find("kristal") or n:find("ore") or n:find("gem")) then
-                    local cf = obj:IsA("Model") and obj:GetPivot() or obj.CFrame
-                    local r = "Common"
-                    for rName in pairs(State.RarityConfig) do
-                        if n:find(rName:lower()) then r = rName break end
-                    end
-                    table.insert(list, {
-                        Instance = obj,
-                        CFrame = cf,
-                        Rarity = r,
-                        Price = State.RarityConfig[r].Price,
-                        Priority = State.RarityConfig[r].Priority
-                    })
-                end
+local function autoSnipeGlobalLoop()
+    if not State.AutoSnipeGlobal or State.IsSniping or State.IsReturning then return end
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local crystals = findCrystalsInMap()
+    if #crystals == 0 then return end
+
+    for _, c in ipairs(crystals) do
+        if not State.AutoSnipeGlobal then break end
+
+        local passPrice = (c.Price >= State.SnipeMinPrice)
+        local passSize = (c.SizeRank >= State.SnipeMinSizeRank)
+        local passLuck = (c.Luck >= State.SnipeMinLuck)
+
+        if passPrice and passSize and passLuck then
+            State.IsSniping = true
+            State.LastMiningPosition = hrp.CFrame
+
+            WindUI:Notify({
+                Title = "🎯 Sniping Kristal!",
+                Content = string.format("Teleport ke %s (%s | %s)!", c.Name, c.PriceDisplay, c.SizeName),
+                Duration = 2
+            })
+
+            teleportTo(c.CFrame + Vector3.new(0, 1.5, -2))
+            task.wait(0.2)
+
+            -- Bersihkan tanah timbunan di sekeliling kristal
+            clearDirtAroundPosition(c.Position, 4)
+            task.wait(0.1)
+
+            if c.Prompt and type(fireproximityprompt) == "function" then
+                pcall(function() fireproximityprompt(c.Prompt) end)
             end
+            if Remotes.PickupGem then pcall(function() Remotes.PickupGem:FireServer(c.Instance) end) end
+            if Remotes.GemCollected then pcall(function() Remotes.GemCollected:FireServer(c.Instance) end) end
+
+            task.wait(0.3)
+            State.IsSniping = false
+            break
         end
     end
-    table.sort(list, function(a, b) return a.Priority > b.Priority end)
-    return list
 end
 
 -- ===================================================================
@@ -627,7 +961,6 @@ local function autoPickupGemLoop()
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
-    -- Proteksi: Jika player baru saja drop kristal dalam 6 detik terakhir, tahan magnet di sekitar
     if tick() - State.LastSelfDropTick < 6 then return end
 
     local rarityRank = {
@@ -645,7 +978,6 @@ local function autoPickupGemLoop()
     for _, obj in ipairs(targetContainer:GetChildren()) do
         if not State.AutoPickupGem then break end
         
-        -- Cek cooldown individual
         if State.DroppedGemsCooldown[obj] and (tick() - State.DroppedGemsCooldown[obj] < 8) then
             continue
         end
@@ -737,17 +1069,24 @@ task.spawn(function()
             end
         end
 
-        if State.AutoMineMostExpensive and not State.IsReturning then
+        -- GLOBAL CRYSTAL SNIPER
+        if State.AutoSnipeGlobal and not State.IsSniping and not State.IsReturning then
+            autoSnipeGlobalLoop()
+        end
+
+        -- TP KE KRISTAL TERMAHAL
+        if State.AutoMineMostExpensive and not State.IsReturning and not State.IsSniping then
             local crystals = findCrystalsInMap()
             if #crystals > 0 then
                 local targetCrystal = crystals[1]
-                teleportTo(targetCrystal.CFrame)
+                teleportTo(targetCrystal.CFrame + Vector3.new(0, 1.5, -2))
+                clearDirtAroundPosition(targetCrystal.Position, 3)
                 
-                local prompt = targetCrystal.Instance:FindFirstChildOfClass("ProximityPrompt", true)
-                if prompt and type(fireproximityprompt) == "function" then
-                    fireproximityprompt(prompt)
+                if targetCrystal.Prompt and type(fireproximityprompt) == "function" then
+                    pcall(function() fireproximityprompt(targetCrystal.Prompt) end)
                 end
-                triggerDigAction()
+                if Remotes.PickupGem then pcall(function() Remotes.PickupGem:FireServer(targetCrystal.Instance) end) end
+                if Remotes.GemCollected then pcall(function() Remotes.GemCollected:FireServer(targetCrystal.Instance) end) end
             end
         end
         task.wait(0.5)
@@ -993,7 +1332,7 @@ end)
 -- MEMBUAT WINDOW DAN 8 TABS LENGKAP DENGAN WINDUI
 -- ===================================================================
 local Window = WindUI:CreateWindow({
-    Title = "❄️ Antartica Mining Hub (v4.9)",
+    Title = "❄️ Antartica Mining Hub (v5.0)",
     Icon = "mountain",
     Author = "by Rhdevs",
     Folder = "AntarticaHub",
@@ -1083,6 +1422,14 @@ AutoTab:Slider({
     Step = 0.05,
     Value = { Min = 0.1, Max = 1.2, Default = 0.55 },
     Callback = function(val) State.CarveSpeed = val end
+})
+
+AutoTab:Slider({
+    Title = "📏 Jarak Galian Dig ke Depan",
+    Desc = "Jarak jangkauan titik penggalian dari posisi karakter (studs)",
+    Step = 1,
+    Value = { Min = 2, Max = 15, Default = 5 },
+    Callback = function(val) State.DigVectorDistance = val end
 })
 
 -- TAB 3: REMOTE HACKS & UTILITIES
@@ -1230,8 +1577,83 @@ PlayerTab:Toggle({
     Callback = function(state) State.LoopFollowPlayer = state end
 })
 
--- TAB 5: BAG & CRYSTALS & PLOT STACKER
+-- TAB 5: BAG & CRYSTALS & SULTAN SNIPER
 local BagTab = Window:Tab({ Title = "Bag & Crystals", Icon = "gem" })
+
+BagTab:Toggle({
+    Title = "🎯 Auto Snipe Kristal Sultan (Global Map)",
+    Desc = "Memindai seluruh map & teleport instan mengambil kristal mewah galian siapapun di gunung",
+    Default = false,
+    Callback = function(state) State.AutoSnipeGlobal = state end
+})
+
+local priceMap = {
+    ["Semua ($0+)"]  = 0,
+    ["$100K+"]       = 1e5,
+    ["$1M+"]         = 1e6,
+    ["$10M+"]        = 1e7,
+    ["$100M+"]       = 1e8,
+    ["$1B+"]         = 1e9,
+    ["$100B+"]       = 1e11,
+    ["$1T+"]         = 1e12,
+    ["$1Qa+"]        = 1e15
+}
+
+BagTab:Dropdown({
+    Title = "💵 Min. Harga Snipe ($)",
+    Desc = "Filter harga minimal kristal yang disnipe ($1K s/d $1Qa)",
+    Values = { "Semua ($0+)", "$100K+", "$1M+", "$10M+", "$100M+", "$1B+", "$100B+", "$1T+", "$1Qa+" },
+    Default = "Semua ($0+)",
+    Callback = function(val)
+        State.SnipeMinPriceDisplay = val
+        State.SnipeMinPrice = priceMap[val] or 0
+    end
+})
+
+local sizeRankMap = {
+    ["Semua Ukuran"]         = 1,
+    ["Medium+ (Sedang)"]     = 3,
+    ["Large+ (Besar)"]       = 4,
+    ["Giant+ (Raksasa)"]     = 5,
+    ["Colossal+ (Kolosus)"]  = 6
+}
+
+BagTab:Dropdown({
+    Title = "📏 Min. Ukuran Kristal",
+    Desc = "Filter ukuran minimal kristal yang diambil",
+    Values = { "Semua Ukuran", "Medium+ (Sedang)", "Large+ (Besar)", "Giant+ (Raksasa)", "Colossal+ (Kolosus)" },
+    Default = "Semua Ukuran",
+    Callback = function(val)
+        State.SnipeMinSizeDisplay = val
+        State.SnipeMinSizeRank = sizeRankMap[val] or 1
+    end
+})
+
+local luckMap = {
+    ["Semua Luck (0%+)"] = 0,
+    ["+0.5%+"]           = 0.5,
+    ["+1.0%+"]           = 1.0,
+    ["+3.0%+"]           = 3.0,
+    ["+5.0%+"]           = 5.0,
+    ["+10.0%+"]          = 10.0
+}
+
+BagTab:Dropdown({
+    Title = "🍀 Min. Keberuntungan (Luck)",
+    Desc = "Filter persentase Keberuntungan minimal kristal",
+    Values = { "Semua Luck (0%+)", "+0.5%+", "+1.0%+", "+3.0%+", "+5.0%+", "+10.0%+" },
+    Default = "Semua Luck (0%+)",
+    Callback = function(val)
+        State.SnipeMinLuckDisplay = val
+        State.SnipeMinLuck = luckMap[val] or 0
+    end
+})
+
+BagTab:Button({
+    Title = "🔍 Scan & Cek Kristal Termahal di Map",
+    Desc = "Pindai seluruh map sekarang & tampilkan info kristal termahal via notifikasi",
+    Callback = function() scanAndShowTopCrystal() end
+})
 
 BagTab:Toggle({
     Title = "💎 Auto Mine Kristal Termahal (Liar)",
@@ -1302,10 +1724,10 @@ BagTab:Input({
 })
 
 BagTab:Button({
-    Title = "🥞 Tumpuk Kristal Bagus (Spam Posisi Saat Ini)",
-    Desc = "Memasang kristal terbaik dari tangan/tas/ID menumpuk tepat di KOORDINAT BERDIRI saat ini",
+    Title = "🥞 Tumpuk Kristal Terbaik (Equip-Then-Drop)",
+    Desc = "Pegang kristal terbaik di tas satu per satu lalu tumpuk di titik berdiri saat ini",
     Callback = function()
-        local count = stackGoodCrystalsAtCurrentPosition("Rare")
+        local count = stackGoodCrystalsAtCurrentPosition()
         WindUI:Notify({ Title = "Plot Crystal Stacker", Content = string.format("Memproses penumpukan %d kristal di posisi berdiri saat ini!", count), Duration = 3 })
     end
 })
@@ -1318,7 +1740,6 @@ BagTab:Button({
         if Remotes.RequestSell then
             pcall(function() Remotes.RequestSell:FireServer("All") end)
             pcall(function() Remotes.RequestSell:FireServer() end)
-        end
         WindUI:Notify({ Title = "Jual Kristal", Content = "Remote RequestSell('All') berhasil dipicu!", Duration = 2 })
     end
 })
@@ -1483,9 +1904,9 @@ DevTab:Button({
     end
 })
 
-print("❄️ Antartica Mining Hub (v4.9 Stability Release) Berhasil Dimuat!")
+print("❄️ Antartica Mining Hub (v5.0 Sultan Sniper & Excavation Release) Berhasil Dimuat!")
 WindUI:Notify({
-    Title = "❄️ Antartica Hub v4.9 Active",
-    Content = "Fix Noclip Void + Surface Snapping + Anti-Drop Magnet Filter + Stacker Ready!",
-    Duration = 4
+    Title = "❄️ Antartica Hub v5.0 Active",
+    Content = "Global Sultan Sniper ($1k-$1Qa) + Auto-Clear Dirt + Equip-Drop Stacker Ready!",
+    Duration = 5
 })
