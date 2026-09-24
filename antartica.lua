@@ -191,37 +191,58 @@ local State = {
     }
 }
 
+-- HELPER PENCARI REMOTE DINAMIS (ANTI NIL KARENA DELAY REPLIKASI GAME)
+local function getRemote(folderName, remoteName)
+    local f = ReplicatedStorage:FindFirstChild(folderName) or ReplicatedStorage:WaitForChild(folderName, 1)
+    if f then
+        local r = f:FindFirstChild(remoteName) or f:WaitForChild(remoteName, 1)
+        if r then return r end
+    end
+    for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
+        if (desc:IsA("RemoteEvent") or desc:IsA("RemoteFunction")) and desc.Name == remoteName then
+            return desc
+        end
+    end
+    return nil
+end
+
 -- REMOTES REFERENCE DARI EVENT.TXT (103 REMOTES)
-local Remotes = {
-    DigRequest        = ReplicatedStorage:FindFirstChild("DigRemotes") and ReplicatedStorage.DigRemotes:FindFirstChild("DigRequest"),
-    PickupGem         = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("PickupGem"),
-    GemCollected      = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("GemCollected"),
-    MineHit           = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("MineHit"),
-    SetLuck           = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("SetLuck"),
-    DropCrystal       = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("DropCrystal"),
-    RequestSell       = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("RequestSell"),
-    OpenSellerMenu    = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("OpenSellerMenu"),
-    RequestOpenSeller = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("RequestOpenSeller"),
-    OpenBombShop      = ReplicatedStorage:FindFirstChild("BombRemotes") and ReplicatedStorage.BombRemotes:FindFirstChild("OpenShop"),
-    ExplodeBomb       = ReplicatedStorage:FindFirstChild("BombRemotes") and ReplicatedStorage.BombRemotes:FindFirstChild("Explode"),
-    OpenRadarShop     = ReplicatedStorage:FindFirstChild("RadarRemotes") and ReplicatedStorage.RadarRemotes:FindFirstChild("OpenShop"),
-    Starfall          = ReplicatedStorage:FindFirstChild("WeatherRemotes") and ReplicatedStorage.WeatherRemotes:FindFirstChild("Starfall"),
-    MeteorEvent       = ReplicatedStorage:FindFirstChild("MeteorRemotes") and ReplicatedStorage.MeteorRemotes:FindFirstChild("Event"),
-    MountainRegen     = ReplicatedStorage:FindFirstChild("MountainRemotes") and ReplicatedStorage.MountainRemotes:FindFirstChild("Regen"),
-    AdminControl      = ReplicatedStorage:FindFirstChild("MountainRemotes") and ReplicatedStorage.MountainRemotes:FindFirstChild("AdminControl"),
-    RedeemCode        = ReplicatedStorage:FindFirstChild("RedeemCode"),
-    GroupVerify       = ReplicatedStorage:FindFirstChild("GroupRewardRemotes") and ReplicatedStorage.GroupRewardRemotes:FindFirstChild("Verify"),
-    AdminAbuseTrigger = ReplicatedStorage:FindFirstChild("AdminAbuseRemotes") and ReplicatedStorage.AdminAbuseRemotes:FindFirstChild("Trigger"),
+local Remotes = setmetatable({
+    DigRequest        = getRemote("DigRemotes", "DigRequest"),
+    PickupGem         = getRemote("GemSignals", "PickupGem"),
+    GemCollected      = getRemote("GemSignals", "GemCollected"),
+    MineHit           = getRemote("GemSignals", "MineHit"),
+    SetLuck           = getRemote("GemSignals", "SetLuck"),
+    DropCrystal       = getRemote("GemSignals", "DropCrystal"),
+    RequestSell       = getRemote("GemRemotes", "RequestSell"),
+    OpenSellerMenu    = getRemote("GemRemotes", "OpenSellerMenu"),
+    RequestOpenSeller = getRemote("GemRemotes", "RequestOpenSeller"),
+    OpenBombShop      = getRemote("BombRemotes", "OpenShop"),
+    ExplodeBomb       = getRemote("BombRemotes", "Explode"),
+    OpenRadarShop     = getRemote("RadarRemotes", "OpenShop"),
+    Starfall          = getRemote("WeatherRemotes", "Starfall"),
+    MeteorEvent       = getRemote("MeteorRemotes", "Event"),
+    MountainRegen     = getRemote("MountainRemotes", "Regen"),
+    AdminControl      = getRemote("MountainRemotes", "AdminControl"),
+    RedeemCode        = ReplicatedStorage:FindFirstChild("RedeemCode") or getRemote("RedeemCode", "RedeemCode"),
+    GroupVerify       = getRemote("GroupRewardRemotes", "Verify"),
+    AdminAbuseTrigger = getRemote("AdminAbuseRemotes", "Trigger"),
     
     -- PLOT REMOTES
-    PlaceCrystal      = ReplicatedStorage:FindFirstChild("PlotRemotes") and ReplicatedStorage.PlotRemotes:FindFirstChild("PlaceCrystal"),
-    TakeCrystal       = ReplicatedStorage:FindFirstChild("PlotRemotes") and ReplicatedStorage.PlotRemotes:FindFirstChild("TakeCrystal"),
-    TakeOut           = ReplicatedStorage:FindFirstChild("PlotRemotes") and ReplicatedStorage.PlotRemotes:FindFirstChild("TakeOut"),
+    PlaceCrystal      = getRemote("PlotRemotes", "PlaceCrystal"),
+    TakeCrystal       = getRemote("PlotRemotes", "TakeCrystal"),
+    TakeOut           = getRemote("PlotRemotes", "TakeOut"),
     
     -- BACKPACK TELEPORTS
-    TeleportPlot      = ReplicatedStorage:FindFirstChild("BackpackRemotes") and ReplicatedStorage.BackpackRemotes:FindFirstChild("TeleportPlot"),
-    TeleportSell      = ReplicatedStorage:FindFirstChild("BackpackRemotes") and ReplicatedStorage.BackpackRemotes:FindFirstChild("TeleportSell"),
-}
+    TeleportPlot      = getRemote("BackpackRemotes", "TeleportPlot"),
+    TeleportSell      = getRemote("BackpackRemotes", "TeleportSell"),
+}, {
+    __index = function(tbl, key)
+        local found = getRemote(key, key)
+        if found then rawset(tbl, key, found) return found end
+        return nil
+    end
+})
 
 -- PENCATAT WAKTU DROP SENDIRI (ANTI-MAGNET LANGSUNG)
 if Remotes.DropCrystal then
@@ -315,10 +336,12 @@ end
 
 local function isInsidePlot(obj)
     if not State.StrictPlotFilter then return false end
+    if not obj or obj == Workspace or obj == Workspace.Terrain then return false end
+
     local current = obj
     while current and current ~= Workspace do
         local n = current.Name:lower()
-        if n:find("plot") or n:find("kebun") or n:find("garden") or n:find("farm") or n:find("base") or n:find("pajangan") or n:find("display") then
+        if (n:find("plot") or n:find("kebun") or n:find("garden") or n:find("farm") or n:find("pajangan") or n:find("display")) and not n:find("baseplate") then
             return true
         end
         current = current.Parent
@@ -326,7 +349,7 @@ local function isInsidePlot(obj)
 
     local pos = obj:IsA("Model") and obj:GetPivot().Position or (obj:IsA("BasePart") and obj.Position)
     if pos then
-        local plotsFolder = Workspace:FindFirstChild("Plots") or Workspace:FindFirstChild("Bases")
+        local plotsFolder = Workspace:FindFirstChild("Plots")
         if plotsFolder then
             for _, plot in ipairs(plotsFolder:GetChildren()) do
                 local plotPos = plot:IsA("Model") and plot:GetPivot().Position or (plot:IsA("BasePart") and plot.Position)
@@ -740,32 +763,50 @@ end
 -- ===================================================================
 -- PENCARIAN KRISTAL GLOBAL MAP (EXCLUDE PLOT & EXCLUDE DROP SENDIRI)
 -- ===================================================================
+-- ===================================================================
+-- PENCARIAN KRISTAL GLOBAL MAP (EXCLUDE PLOT & EXCLUDE DROP SENDIRI)
+-- ===================================================================
 local function findCrystalsInMap()
     local list = {}
     local searched = {}
 
-    local containers = {
+    -- 1. CARI SEMUA PROXIMITYPROMPT DI WORKSPACE (CARA PALING PRESISI UNTUK KRISTAL GAME INI)
+    for _, prompt in ipairs(Workspace:GetDescendants()) do
+        if prompt:IsA("ProximityPrompt") then
+            local act = (prompt.ActionText or ""):lower()
+            local objT = prompt.ObjectText or ""
+            -- Kristal di game ini memiliki prompt bertuliskan "AMBIL" atau mengandung "$" atau "KG"
+            if act:find("ambil") or act:find("take") or objT:find("%$") or objT:find("kg") or objT:find("kilogram") then
+                local crystalObj = prompt.Parent
+                if crystalObj and not searched[crystalObj] and not isInsidePlot(crystalObj) then
+                    searched[crystalObj] = true
+                    local info = extractCrystalInfo(crystalObj)
+                    if info then
+                        table.insert(list, info)
+                    end
+                end
+            end
+        end
+    end
+
+    -- 2. CARI DI FOLDER LAINNYA DI WORKSPACE (TERRAIN, GEMS, DEBRIS, ORES, DLL)
+    local namedFolders = {
         Workspace:FindFirstChild("Gems"),
         Workspace:FindFirstChild("Crystals"),
         Workspace:FindFirstChild("Drops"),
         Workspace:FindFirstChild("Debris"),
-        Workspace
+        Workspace:FindFirstChild("Ores"),
+        Workspace:FindFirstChild("Map")
     }
-
-    for _, container in ipairs(containers) do
-        if container then
-            for _, obj in ipairs(container:GetChildren()) do
-                if not searched[obj] and (obj:IsA("Model") or obj:IsA("BasePart")) then
-                    searched[obj] = true
-
-                    if not (State.DroppedGemsCooldown[obj] and (tick() - State.DroppedGemsCooldown[obj] < 8)) then
-                        if not isInsidePlot(obj) then
-                            if isCrystalCandidate(obj) then
-                                local info = extractCrystalInfo(obj)
-                                if info then
-                                    table.insert(list, info)
-                                end
-                            end
+    for _, folder in ipairs(namedFolders) do
+        if folder then
+            for _, obj in ipairs(folder:GetChildren()) do
+                if (obj:IsA("Model") or obj:IsA("BasePart")) and not searched[obj] then
+                    if isCrystalCandidate(obj) and not isInsidePlot(obj) then
+                        searched[obj] = true
+                        local info = extractCrystalInfo(obj)
+                        if info then
+                            table.insert(list, info)
                         end
                     end
                 end
@@ -795,8 +836,8 @@ local function scanAndShowTopCrystal()
     if #crystals == 0 then
         WindUI:Notify({
             Title = "🔍 Scan Map",
-            Content = "Belum ada kristal liar yang terdeteksi di permukaan gunung (semua di plot atau belum digali).",
-            Duration = 3
+            Content = "Ditemukan 0 kristal liar di permukaan gunung.\n(Catatan: Di game ini kristal baru muncul dari server saat lereng gunung digali dengan AFK Dig).",
+            Duration = 5
         })
         return
     end
@@ -806,7 +847,7 @@ local function scanAndShowTopCrystal()
         Title = "💎 Kristal Termahal di Map!",
         Content = string.format("Nama: %s\nHarga: %s\nUkuran: %s\nBobot: %.1f KG\nLuck: +%.1f%%",
             top.Name, top.PriceDisplay, top.SizeName, top.Weight, top.Luck),
-        Duration = 5
+        Duration = 6
     })
 end
 
@@ -823,67 +864,61 @@ local function triggerDigAction()
     local flatDir = Vector3.new(lookDir.X, 0, lookDir.Z).Unit
     if flatDir.Magnitude < 0.1 then flatDir = hrp.CFrame.LookVector end
 
-    -- 1. DETEKSI KRISTAL TERTIMBUN DI DEKAT PEMAIN (RADIUS 25 STUD)
-    local nearbyBuried = nil
-    local minDist = 25
-    local candidates = Workspace:FindFirstChild("Gems") or Workspace:FindFirstChild("Crystals") or Workspace
-    for _, obj in ipairs(candidates:GetChildren()) do
-        if not isInsidePlot(obj) and isCrystalCandidate(obj) then
-            local pos = obj:IsA("Model") and obj:GetPivot().Position or (obj:IsA("BasePart") and obj.Position)
-            if pos then
-                local dist = (pos - hrp.Position).Magnitude
-                if dist < minDist then
-                    minDist = dist
-                    nearbyBuried = { obj = obj, pos = pos }
+    -- 1. DETEKSI & AMBIL KRISTAL TERTIMBUN DI DEKAT PEMAIN (RADIUS 15 STUD)
+    -- HANYA proses objek non-karakter dan di luar plot
+    for _, prompt in ipairs(Workspace:GetDescendants()) do
+        if prompt:IsA("ProximityPrompt") then
+            local pPart = prompt.Parent
+            if pPart and not pPart:IsDescendantOf(char) and not isInsidePlot(pPart) then
+                local pPos = pPart:IsA("BasePart") and pPart.Position or (pPart:IsA("Model") and pPart:GetPivot().Position)
+                if pPos and (pPos - hrp.Position).Magnitude <= 15 then
+                    -- Bersihkan tanah timbunan di sekeliling kristal
+                    clearDirtAroundPosition(pPos, 2)
+                    if type(fireproximityprompt) == "function" then
+                        pcall(function() fireproximityprompt(prompt) end)
+                    end
+                    if Remotes.PickupGem then pcall(function() Remotes.PickupGem:FireServer(pPart) end) end
+                    if Remotes.GemCollected then pcall(function() Remotes.GemCollected:FireServer(pPart) end) end
                 end
             end
         end
     end
 
-    if nearbyBuried then
-        -- Kristal tertimbun terdeteksi: Jeda langkah & sembur DigRequest untuk membersihkan tanahnya!
-        hum:Move(Vector3.zero, false)
-        clearDirtAroundPosition(nearbyBuried.pos, 3)
+    -- 2. PENGGALIAN NORMAL KE DEPAN LERENG GUNUNG (DIG REQUEST VECTOR3)
+    local targetDigVector = hrp.Position + (flatDir * State.DigVectorDistance)
+    if Remotes.DigRequest then
+        pcall(function() Remotes.DigRequest:FireServer(targetDigVector) end)
+    end
+    if Remotes.MineHit then
+        pcall(function() Remotes.MineHit:FireServer() end)
+    end
 
-        local prompt = nearbyBuried.obj:FindFirstChildOfClass("ProximityPrompt", true)
-        if prompt and type(fireproximityprompt) == "function" then
-            pcall(function() fireproximityprompt(prompt) end)
-        end
-        if Remotes.PickupGem then pcall(function() Remotes.PickupGem:FireServer(nearbyBuried.obj) end) end
-        if Remotes.GemCollected then pcall(function() Remotes.GemCollected:FireServer(nearbyBuried.obj) end) end
-        task.wait(0.08)
-    else
-        -- 2. PENGGALIAN NORMAL KE DEPAN LERENG GUNUNG
-        local targetDigVector = hrp.Position + (flatDir * State.DigVectorDistance)
-        if Remotes.DigRequest then
-            pcall(function() Remotes.DigRequest:FireServer(targetDigVector) end)
-        end
-        if Remotes.MineHit then
-            pcall(function() Remotes.MineHit:FireServer() end)
-        end
+    -- Pemicu Tool jika dipegang
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then tool:Activate() end
 
-        local tool = char:FindFirstChildOfClass("Tool")
-        if tool then tool:Activate() end
+    -- 3. PERGERAKAN MAJU & PANJAT GUNUNG AFK: SURFACE SNAPPING MULUS (TIDAK FREEZE)
+    if State.AutoAdvanceMountain and State.AutoDig then
+        -- Gerakkan humanoid berjalan ke depan
+        hum:Move(flatDir, false)
 
-        -- 3. PERGERAKAN MAJU & PANJAT GUNUNG AFK: SURFACE SNAPPING (ANTI JATUH KE VOID)
-        if State.AutoAdvanceMountain and State.AutoDig then
-            hum:Move(flatDir, false)
+        local downParams = RaycastParams.new()
+        downParams.FilterAncestorsInstances = { char }
+        downParams.FilterType = Enum.RaycastFilterType.Exclude
 
-            local stepAheadPos = hrp.Position + (flatDir * State.CarveSpeed) + Vector3.new(0, 3, 0)
-            local downParams = RaycastParams.new()
-            downParams.FilterAncestorsInstances = { char }
-            downParams.FilterType = Enum.RaycastFilterType.Exclude
-
-            local groundHit = Workspace:Raycast(stepAheadPos, Vector3.new(0, -12, 0), downParams)
-            if groundHit then
-                local surfaceY = groundHit.Position.Y + 3.0
-                local targetPos = Vector3.new(stepAheadPos.X, surfaceY, stepAheadPos.Z)
-                hrp.CFrame = CFrame.new(targetPos, targetPos + flatDir)
-            else
-                local forwardHit = Workspace:Raycast(hrp.Position, flatDir * 3.5, downParams)
-                if forwardHit then
-                    hum.Jump = true
-                end
+        -- Cek kontur tanah lereng di depan
+        local stepAheadPos = hrp.Position + (flatDir * State.CarveSpeed) + Vector3.new(0, 3.5, 0)
+        local groundHit = Workspace:Raycast(stepAheadPos, Vector3.new(0, -10, 0), downParams)
+        if groundHit then
+            local surfaceY = groundHit.Position.Y + 3.0
+            local targetPos = Vector3.new(stepAheadPos.X, surfaceY, stepAheadPos.Z)
+            -- Gunakan CFrame Lerp agar pergerakan tetap berkesinambungan dan tidak mereset fisika karakter
+            hrp.CFrame = hrp.CFrame:Lerp(CFrame.new(targetPos, targetPos + flatDir), 0.5)
+        else
+            -- Cek tebing di depan untuk lompat otomatis
+            local forwardHit = Workspace:Raycast(hrp.Position, flatDir * 3.5, downParams)
+            if forwardHit then
+                hum.Jump = true
             end
         end
     end
