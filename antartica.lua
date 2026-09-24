@@ -142,9 +142,10 @@ local State = {
     SelectedRarityFilter = "Semua (All)",
     CurrentBag = 0,
     MaxBagCapacity = 60000,
-    AutoReturnWhenFull = true,
+    AutoReturnWhenFull = false,
     InstantRemoteSell = true,
     IsReturning = false,
+    LastSellTick = 0,
 
     -- Global Crystal Sniper ($1K - $1Qa, Size, Luck)
     AutoSnipeGlobal = false,
@@ -498,32 +499,37 @@ local function getPlayerList()
 end
 
 -- ===================================================================
--- DETEKSI KAPASITAS RANSEL PRESISI (HANYA FORMAT KILOGRAM/KG/PENUH)
+-- DETEKSI KAPASITAS RANSEL PRESISI (HANYA FORMAT KILOGRAM/KG ASLI GAME)
 -- ===================================================================
 local function detectActualBagCount()
     local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if pg then
-        for _, lbl in ipairs(pg:GetDescendants()) do
-            if lbl:IsA("TextLabel") and lbl.Visible and lbl.Text ~= "" then
-                local txt = lbl.Text:lower()
-                -- HANYA proses jika teks berhubungan dengan ransel/berat/penuh
-                if txt:find("penuh") or txt:find("full") then
-                    State.CurrentBag = State.MaxBagCapacity
-                    return
-                end
+    if not pg then return end
 
-                if txt:find("kilo") or txt:find("kg") or (lbl.Parent and lbl.Parent.Name:lower():find("ransel")) then
-                    local cur, max = lbl.Text:match("([%d%,%.]+)%s*/%s*([%d%,%.]+)")
-                    if cur and max then
-                        local cleanCur = cur:gsub(",", "")
-                        local cleanMax = max:gsub(",", "")
-                        local cNum = tonumber(cleanCur)
-                        local mNum = tonumber(cleanMax)
-                        if cNum and mNum and mNum > 0 then
-                            State.CurrentBag = cNum
-                            State.MaxBagCapacity = mNum
-                            return
-                        end
+    for _, lbl in ipairs(pg:GetDescendants()) do
+        if lbl:IsA("TextLabel") and lbl.Visible and lbl.Text ~= "" then
+            -- 1. Abaikan mutlak GUI milik script sendiri (WindUI, D-Pad, ErgoControls)
+            local pName = lbl.Parent and lbl.Parent.Name:lower() or ""
+            local ancestorGui = lbl:FindFirstAncestorOfClass("ScreenGui")
+            local guiName = ancestorGui and ancestorGui.Name:lower() or ""
+            if guiName:find("wind") or guiName:find("antartica") or pName:find("wind") or pName:find("antartica") then
+                continue
+            end
+
+            -- 2. Cari format kapasitas ransel game asli: "736.0 / 61267.0 kilogram"
+            local raw = lbl.Text
+            local cur, max = raw:match("([%d%,%.]+)%s*/%s*([%d%,%.]+)")
+            if cur and max then
+                local txtLower = raw:lower()
+                -- HANYA terima jika benar-benar ada kata kilogram/kg atau parent berlabel ransel/bag
+                if txtLower:find("kilo") or txtLower:find("kg") or pName:find("ransel") or pName:find("bag") or pName:find("weight") then
+                    local cleanCur = cur:gsub(",", "")
+                    local cleanMax = max:gsub(",", "")
+                    local cNum = tonumber(cleanCur)
+                    local mNum = tonumber(cleanMax)
+                    if cNum and mNum and mNum > 100 then
+                        State.CurrentBag = cNum
+                        State.MaxBagCapacity = mNum
+                        return
                     end
                 end
             end
@@ -1017,8 +1023,9 @@ end
 -- AUTO-RETURN / INSTANT REMOTE SELL SAAT RANSEL PENUH
 -- ===================================================================
 local function executeAutoReturnToSell()
-    if State.IsReturning then return end
+    if State.IsReturning or (tick() - State.LastSellTick < 6) then return end
     State.IsReturning = true
+    State.LastSellTick = tick()
 
     if State.InstantRemoteSell then
         if Remotes.RequestSell then
@@ -1063,8 +1070,8 @@ task.spawn(function()
             autoPickupGemLoop()
         end
 
-        if State.AutoReturnWhenFull and not State.IsReturning then
-            if State.CurrentBag > 0 and State.CurrentBag >= State.MaxBagCapacity then
+        if State.AutoReturnWhenFull and not State.IsReturning and (tick() - State.LastSellTick >= 6) then
+            if State.MaxBagCapacity > 100 and State.CurrentBag > 0 and State.CurrentBag >= State.MaxBagCapacity then
                 executeAutoReturnToSell()
             end
         end
@@ -1679,7 +1686,7 @@ BagTab:Toggle({
 BagTab:Toggle({
     Title = "🎒 Auto Sell Saat Ransel Penuh",
     Desc = "Otomatis memicu RequestSell('All') saat ransel terdeteksi penuh",
-    Default = true,
+    Default = false,
     Callback = function(state) State.AutoReturnWhenFull = state end
 })
 
