@@ -1,16 +1,16 @@
 --[[
     ===================================================================
-    ❄️ ANTARTICA HUB - MOUNTAIN MINING & UTILITY (v4.6 Plot Stacker & Sell All)
+    ❄️ ANTARTICA HUB - MOUNTAIN MINING & UTILITY (v4.7 Verified Edition)
     ===================================================================
     UI Library: WindUI (https://github.com/Footagesus/WindUI)
     Dibuat untuk: Owner Game, Map Tester & Player (Roblox Mountain Mining)
     
     Kelengkapan Tab WindUI (8 Tabs Lengkap):
       1. 🏃 Movement (Fly Toggle, D-Pad Toggle, Fly Speed, WalkSpeed, GodMode, Anti-Fall, Noclip)
-      2. ⛏️ Mining & Dig (Auto Dig + Maju Hancurkan Gunung, Power Boost Slider 20k, Auto Equip)
-      3. ⚡ Remote Hacks (Jetpack Thrust, Plasma Drill, Bomb Explode, Radar Pulse, Starfall, Meteor, Code Redeem)
+      2. ⛏️ Mining & Dig (Auto Dig + Vector3 DigRequest, Maju Panjat Gunung AFK Step-by-Step)
+      3. ⚡ Remote Hacks (Starfall, Meteor Event, Mountain Regen, Super Luck, Redeem Code)
       4. 👥 Target Player (Player List Dropdown, Refresh List, TP to Target, Auto Follow/Spectate)
-      5. 🎒 Bag & Crystals (Auto Mine Termahal, Filter Plot Strict, Instant Sell All, Ambil & Tumpuk Kristal Plot)
+      5. 🎒 Bag & Crystals (Auto Mine Termahal Liar, Filter Plot Strict, Instant Sell, Toggle Ambil Plot Wide, Stacker Spam)
       6. 📍 Teleports & Shops (TP & Buka UI Toko Jual, Bom, Pickaxe, Upgrade, Radar, Peak, CFrame Copy)
       7. ☀️ Map Inspector (TimeOfDay Slider 0-24, Fullbright, No Fog, Infinite Jump)
       8. 🔍 Dev Scanner (Scan Remotes ke File/Clipboard, Count Crystals, Open Shop UI Remote Test)
@@ -81,7 +81,7 @@ local function copyToRealClipboard(text)
     return copied
 end
 
-saveLocalFile("antartica_logs.txt", "=== Antartica Hub v4.6 Plot Stacker & Sell All Edition Dijalankan ===", true)
+saveLocalFile("antartica_logs.txt", "=== Antartica Hub v4.7 Verified Edition Dijalankan ===", true)
 
 -- ===================================================================
 -- LOAD WINDUI LIBRARY
@@ -129,29 +129,26 @@ local State = {
     AutoDig = false,
     AutoAdvanceMountain = true,
     CarveSpeed = 0.45,
-    PickaxePowerBoost = 5000,
-    EnablePowerBoost = true,
+    DigVectorDistance = 5,
     
-    -- Special Hacks & Remotes
-    JetpackThrust = false,
-    AutoPlasmaDrill = false,
-    AutoRadarPulse = false,
-
     -- Target Player
     SelectedPlayerName = nil,
     LoopFollowPlayer = false,
 
     -- Auto Mine & Gem Magnet
     AutoMineMostExpensive = false,
-    AutoMineGeneral = false,
     AutoPickupGem = true,
     StrictPlotFilter = true,
     SelectedRarityFilter = "Semua (All)",
     CurrentBag = 0,
     MaxBagCapacity = 20,
     AutoReturnWhenFull = true,
-    InstantRemoteSell = true, -- Instant Sell tanpa perlu TP jika berada di atas gunung
+    InstantRemoteSell = true,
     IsReturning = false,
+    
+    -- Plot Crystal Features
+    AutoTakePlotCrystals = false, -- Toggle ON/OFF Auto Ambil Plot
+    PlotWideRadius = 200,          -- Wide Radius untuk sedot kristal plot
     
     -- Waypoints Toko Asli
     Waypoints = {
@@ -182,7 +179,6 @@ local State = {
 -- REMOTES REFERENCE DARI EVENT.TXT (103 REMOTES)
 local Remotes = {
     DigRequest        = ReplicatedStorage:FindFirstChild("DigRemotes") and ReplicatedStorage.DigRemotes:FindFirstChild("DigRequest"),
-    SetDigPower       = ReplicatedStorage:FindFirstChild("DigRemotes") and ReplicatedStorage.DigRemotes:FindFirstChild("SetDigPower"),
     PickupGem         = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("PickupGem"),
     GemCollected      = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("GemCollected"),
     MineHit           = ReplicatedStorage:FindFirstChild("GemSignals") and ReplicatedStorage.GemSignals:FindFirstChild("MineHit"),
@@ -192,32 +188,19 @@ local Remotes = {
     RequestOpenSeller = ReplicatedStorage:FindFirstChild("GemRemotes") and ReplicatedStorage.GemRemotes:FindFirstChild("RequestOpenSeller"),
     OpenBombShop      = ReplicatedStorage:FindFirstChild("BombRemotes") and ReplicatedStorage.BombRemotes:FindFirstChild("OpenShop"),
     ExplodeBomb       = ReplicatedStorage:FindFirstChild("BombRemotes") and ReplicatedStorage.BombRemotes:FindFirstChild("Explode"),
-    BuyBomb           = ReplicatedStorage:FindFirstChild("BombRemotes") and ReplicatedStorage.BombRemotes:FindFirstChild("BuyBomb"),
     OpenRadarShop     = ReplicatedStorage:FindFirstChild("RadarRemotes") and ReplicatedStorage.RadarRemotes:FindFirstChild("OpenShop"),
-    RadarUsed         = ReplicatedStorage:FindFirstChild("RadarRemotes") and ReplicatedStorage.RadarRemotes:FindFirstChild("RadarUsed"),
-    PowerFired        = ReplicatedStorage:FindFirstChild("RadarRemotes") and ReplicatedStorage.RadarRemotes:FindFirstChild("PowerFired"),
-    ShopState         = ReplicatedStorage:FindFirstChild("ShopRemotes") and ReplicatedStorage.ShopRemotes:FindFirstChild("ShopState"),
-    UpgradeState      = ReplicatedStorage:FindFirstChild("UpgradeRemotes") and ReplicatedStorage.UpgradeRemotes:FindFirstChild("UpgradeState"),
-    ThrustState       = ReplicatedStorage:FindFirstChild("JetpackSystem") and ReplicatedStorage.JetpackSystem:FindFirstChild("Remotes") and ReplicatedStorage.JetpackSystem.Remotes:FindFirstChild("ThrustState"),
-    DrillEvent        = ReplicatedStorage:FindFirstChild("DrillTools") and ReplicatedStorage.DrillTools:FindFirstChild("Plasma Drill") and ReplicatedStorage.DrillTools["Plasma Drill"]:FindFirstChild("DrillEvent"),
     Starfall          = ReplicatedStorage:FindFirstChild("WeatherRemotes") and ReplicatedStorage.WeatherRemotes:FindFirstChild("Starfall"),
     MeteorEvent       = ReplicatedStorage:FindFirstChild("MeteorRemotes") and ReplicatedStorage.MeteorRemotes:FindFirstChild("Event"),
     MountainRegen     = ReplicatedStorage:FindFirstChild("MountainRemotes") and ReplicatedStorage.MountainRemotes:FindFirstChild("Regen"),
     AdminControl      = ReplicatedStorage:FindFirstChild("MountainRemotes") and ReplicatedStorage.MountainRemotes:FindFirstChild("AdminControl"),
     RedeemCode        = ReplicatedStorage:FindFirstChild("RedeemCode"),
-    UsePotion         = ReplicatedStorage:FindFirstChild("UsePotion"),
-    SyncAllPotions    = ReplicatedStorage:FindFirstChild("SyncAllPotions"),
-    PlaceRune         = ReplicatedStorage:FindFirstChild("RuneRemotes") and ReplicatedStorage.RuneRemotes:FindFirstChild("PlaceRune"),
-    DropRune          = ReplicatedStorage:FindFirstChild("RuneRemotes") and ReplicatedStorage.RuneRemotes:FindFirstChild("DropRune"),
-    BoulderBroken     = ReplicatedStorage:FindFirstChild("BoulderRemotes") and ReplicatedStorage.BoulderRemotes:FindFirstChild("Broken"),
     GroupVerify       = ReplicatedStorage:FindFirstChild("GroupRewardRemotes") and ReplicatedStorage.GroupRewardRemotes:FindFirstChild("Verify"),
     AdminAbuseTrigger = ReplicatedStorage:FindFirstChild("AdminAbuseRemotes") and ReplicatedStorage.AdminAbuseRemotes:FindFirstChild("Trigger"),
     
-    -- PLOT REMOTES (PLACE, TAKE, CONFIG)
+    -- PLOT REMOTES
     PlaceCrystal      = ReplicatedStorage:FindFirstChild("PlotRemotes") and ReplicatedStorage.PlotRemotes:FindFirstChild("PlaceCrystal"),
     TakeCrystal       = ReplicatedStorage:FindFirstChild("PlotRemotes") and ReplicatedStorage.PlotRemotes:FindFirstChild("TakeCrystal"),
     TakeOut           = ReplicatedStorage:FindFirstChild("PlotRemotes") and ReplicatedStorage.PlotRemotes:FindFirstChild("TakeOut"),
-    PopulatePlot      = ReplicatedStorage:FindFirstChild("PlotRemotes") and ReplicatedStorage.PlotRemotes:FindFirstChild("Populate"),
 }
 
 -- ===================================================================
@@ -272,7 +255,7 @@ local function openShopUIByName(keywords, targetCFrame)
 end
 
 -- ===================================================================
--- FUNGSI DETEKSI PLOT SENDIRI & MANAJEMEN KRISTAL PLOT
+-- FUNGSI DETEKSI PLOT SENDIRI & MANAJEMEN KRISTAL PLOT (WIDE RADIUS & STACK)
 -- ===================================================================
 local function getMyPlot()
     local plotsFolder = Workspace:FindFirstChild("Plots") or Workspace:FindFirstChild("Bases") or Workspace:FindFirstChild("Kebun")
@@ -299,48 +282,80 @@ local function getMyPlot()
                     end
                 end
             end
-            if minDist < 100 then return closestPlot end
+            if minDist < 150 then return closestPlot end
         end
     end
     return nil
 end
 
-local function takeAllPlotCrystals()
-    local myPlot = getMyPlot()
-    local count = 0
-    if myPlot then
-        for _, obj in ipairs(myPlot:GetDescendants()) do
-            if obj:IsA("ProximityPrompt") then
-                pcall(function() fireproximityprompt(obj) end)
-                count = count + 1
-            elseif obj:IsA("BasePart") or obj:IsA("Model") then
-                local crystalId = obj:GetAttribute("Id") or obj:GetAttribute("CrystalId") or tonumber(obj.Name)
-                if crystalId then
-                    if Remotes.TakeCrystal then pcall(function() Remotes.TakeCrystal:FireServer(crystalId) end) end
-                    if Remotes.TakeOut then pcall(function() Remotes.TakeOut:FireServer(crystalId) end) end
-                    count = count + 1
-                end
-            end
+local function isInsidePlot(obj)
+    if not State.StrictPlotFilter then return false end
+    local current = obj
+    while current and current ~= Workspace do
+        local n = current.Name:lower()
+        if n:find("plot") or n:find("kebun") or n:find("garden") or n:find("farm") or n:find("base") or n:find("pajangan") or n:find("display") then
+            return true
         end
-    else
-        local char = LocalPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            for _, obj in ipairs(Workspace:GetDescendants()) do
-                if obj:IsA("ProximityPrompt") then
-                    local pPos = obj.Parent and obj.Parent:IsA("BasePart") and obj.Parent.Position
-                    if pPos and (pPos - hrp.Position).Magnitude < 40 then
-                        pcall(function() fireproximityprompt(obj) end)
-                        count = count + 1
-                    end
+        current = current.Parent
+    end
+
+    local pos = obj:IsA("Model") and obj:GetPivot().Position or (obj:IsA("BasePart") and obj.Position)
+    if pos then
+        local plotsFolder = Workspace:FindFirstChild("Plots") or Workspace:FindFirstChild("Bases")
+        if plotsFolder then
+            for _, plot in ipairs(plotsFolder:GetChildren()) do
+                local plotPos = plot:IsA("Model") and plot:GetPivot().Position or (plot:IsA("BasePart") and plot.Position)
+                if plotPos and (pos - plotPos).Magnitude < 35 then
+                    return true
                 end
             end
         end
     end
-    return count
+    return false
 end
 
-local function stackGoodCrystalsOnMyPlot(minRarityName)
+-- TOGGLE AUTO AMBIL KRISTAL PLOT (WIDE RADIUS CONTINUOUS LOOP)
+local function sweepAndTakePlotCrystals()
+    if not State.AutoTakePlotCrystals then return end
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local myPlot = getMyPlot()
+    local targetFolder = myPlot or Workspace
+
+    for _, obj in ipairs(targetFolder:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            local pPos = obj.Parent and obj.Parent:IsA("BasePart") and obj.Parent.Position
+            if pPos and (pPos - hrp.Position).Magnitude <= State.PlotWideRadius then
+                pcall(function() fireproximityprompt(obj) end)
+            end
+        elseif (obj:IsA("BasePart") or obj:IsA("Model")) then
+            local pos = obj:IsA("Model") and obj:GetPivot().Position or obj.Position
+            if pos and (pos - hrp.Position).Magnitude <= State.PlotWideRadius then
+                local crystalId = obj:GetAttribute("Id") or obj:GetAttribute("CrystalId") or tonumber(obj.Name)
+                if crystalId then
+                    if Remotes.TakeCrystal then pcall(function() Remotes.TakeCrystal:FireServer(crystalId) end) end
+                    if Remotes.TakeOut then pcall(function() Remotes.TakeOut:FireServer(crystalId) end) end
+                end
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    while true do
+        if State.AutoTakePlotCrystals then
+            sweepAndTakePlotCrystals()
+            task.wait(0.3)
+        else
+            task.wait(1.0)
+        end
+    end
+end)
+
+-- TUMPUK KRISTAL BAGUS SPAM DI POSISI DIRIDIRI KARAKTER SAAT INI
+local function stackGoodCrystalsAtCurrentPosition(minRarityName)
     minRarityName = minRarityName or "Rare"
     local rarityRank = {
         ["Mythic"] = 6,
@@ -354,14 +369,13 @@ local function stackGoodCrystalsOnMyPlot(minRarityName)
 
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return 0 end
-
-    local myPlot = getMyPlot()
-    local baseVector = hrp.Position + (hrp.CFrame.LookVector * 4)
-    if myPlot then
-        local pPos = myPlot:IsA("Model") and myPlot:GetPivot().Position or (myPlot:IsA("BasePart") and myPlot.Position)
-        if pPos then baseVector = pPos + Vector3.new(0, 3, 0) end
+    if not hrp then
+        WindUI:Notify({ Title = "⚠️ Karakter Tidak Ada", Content = "Pastikan karakter aktif saat menumpuk kristal!", Duration = 3 })
+        return 0
     end
+
+    -- Gunakan Titik Koordinat Berdiri Karakter Saat Ini!
+    local currentStandPos = hrp.Position
 
     local itemsToPlace = {}
     local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
@@ -392,8 +406,8 @@ local function stackGoodCrystalsOnMyPlot(minRarityName)
 
     local placedCount = 0
     for index, data in ipairs(itemsToPlace) do
-        -- Tumpuk di posisi Vector3 yang sama dengan sedikit offset ketinggian Y (bertumpuk rapi)
-        local stackPos = Vector3.new(baseVector.X, baseVector.Y + ((index - 1) * 0.35), baseVector.Z)
+        -- Tumpuk tepat di koordinat posisi berdiri karakter saat ini dengan offset Y bertingkat
+        local stackPos = Vector3.new(currentStandPos.X, currentStandPos.Y + ((index - 1) * 0.35), currentStandPos.Z)
         if Remotes.PlaceCrystal then
             pcall(function()
                 Remotes.PlaceCrystal:FireServer(data.Id, stackPos)
@@ -430,14 +444,14 @@ local function getPlayerList()
 end
 
 -- ===================================================================
--- DETEKSI KAPASITAS TAS
+-- DETEKSI KAPASITAS RANSEL (BERDASARKAN TANGKAPAN LAYAR FOTO GAME)
 -- ===================================================================
 local function detectActualBagCount()
     local ls = LocalPlayer:FindFirstChild("leaderstats") or LocalPlayer:FindFirstChild("Stats") or LocalPlayer:FindFirstChild("Data")
     if ls then
         for _, v in ipairs(ls:GetChildren()) do
             local n = v.Name:lower()
-            if n:find("bag") or n:find("crystal") or n:find("ore") or n:find("capacity") or n:find("inv") then
+            if n:find("bag") or n:find("crystal") or n:find("ore") or n:find("capacity") or n:find("inv") or n:find("ransel") then
                 if v:IsA("IntValue") or v:IsA("NumberValue") then State.CurrentBag = v.Value end
             end
             if n:find("max") or n:find("maxbag") or n:find("bagmax") or n:find("maxcapacity") then
@@ -450,11 +464,18 @@ local function detectActualBagCount()
     if pg then
         for _, lbl in ipairs(pg:GetDescendants()) do
             if lbl:IsA("TextLabel") and lbl.Visible and lbl.Text ~= "" then
-                local cur, max = lbl.Text:match("(%d+)%s*/%s*(%d+)")
+                local txt = lbl.Text:lower()
+                -- Format foto game: "45620.0 / 61267.0 kilogram" atau "Ransel Penuh"
+                if txt:find("penuh") or txt:find("full") then
+                    State.CurrentBag = State.MaxBagCapacity
+                    break
+                end
+
+                local cur, max = lbl.Text:match("([%d%.]+)%s*/%s*([%d%.]+)")
                 if cur and max then
                     local cNum = tonumber(cur)
                     local mNum = tonumber(max)
-                    if cNum and mNum and mNum > 0 and mNum <= 5000 then
+                    if cNum and mNum and mNum > 0 then
                         State.CurrentBag = cNum
                         State.MaxBagCapacity = mNum
                         break
@@ -466,52 +487,30 @@ local function detectActualBagCount()
 end
 
 -- ===================================================================
--- BOOST DAYA HANCUR PICKAXE & MOUNTAIN ADVANCE ENGINE
+-- DIG ENGINE TERPERBARUI (PAYLOAD VECTOR3 DIGREQUEST DENGAN SIMPLESPY)
 -- ===================================================================
-local function boostPickaxePower()
-    if not State.EnablePowerBoost then return end
-    if Remotes.SetDigPower then
-        pcall(function() Remotes.SetDigPower:FireServer(State.PickaxePowerBoost) end)
-    end
-
-    local char = LocalPlayer.Character
-    local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
-    local tools = {}
-    
-    if char then
-        for _, t in ipairs(char:GetChildren()) do
-            if t:IsA("Tool") then table.insert(tools, t) end
-        end
-    end
-    if bp then
-        for _, t in ipairs(bp:GetChildren()) do
-            if t:IsA("Tool") then table.insert(tools, t) end
-        end
-    end
-
-    for _, tool in ipairs(tools) do
-        for _, v in ipairs(tool:GetDescendants()) do
-            local vn = v.Name:lower()
-            if (v:IsA("NumberValue") or v:IsA("IntValue")) and 
-               (vn:find("power") or vn:find("damage") or vn:find("strength") or vn:find("speed") or vn:find("dig") or vn:find("mine") or vn:find("multi")) then
-                v.Value = State.PickaxePowerBoost
-            end
-        end
-        pcall(function()
-            for attrName, _ in pairs(tool:GetAttributes()) do
-                local an = attrName:lower()
-                if an:find("power") or an:find("damage") or an:find("strength") or an:find("dig") or an:find("mine") then
-                    tool:SetAttribute(attrName, State.PickaxePowerBoost)
-                end
-            end
-        end)
-    end
-end
-
 local function triggerDigAction()
-    if Remotes.DigRequest then pcall(function() Remotes.DigRequest:FireServer() end) end
-    if Remotes.MineHit then pcall(function() Remotes.MineHit:FireServer() end) end
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hrp then return end
 
+    -- Hitung Target Vector3 di Depan Karakter Sesuai Payload SimpleSpy: DigRequest:FireServer(Vector3.new(...))
+    local lookDir = Camera.CFrame.LookVector
+    local flatDir = Vector3.new(lookDir.X, 0, lookDir.Z).Unit
+    if flatDir.Magnitude < 0.1 then flatDir = hrp.CFrame.LookVector end
+
+    local targetDigVector = hrp.Position + (flatDir * State.DigVectorDistance)
+
+    -- Panggil Remote DigRequest dengan Argumen Vector3 Presisi
+    if Remotes.DigRequest then
+        pcall(function() Remotes.DigRequest:FireServer(targetDigVector) end)
+    end
+    if Remotes.MineHit then
+        pcall(function() Remotes.MineHit:FireServer() end)
+    end
+
+    -- Memicu Tombol Dig pada PlayerGui jika ada
     local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
     if pg then
         for _, obj in ipairs(pg:GetDescendants()) do
@@ -531,44 +530,29 @@ local function triggerDigAction()
         end
     end
 
-    local char = LocalPlayer.Character
+    -- Memicu Tool jika Dipegang
     if char then
         local tool = char:FindFirstChildOfClass("Tool")
-        if tool then
-            tool:Activate()
-        else
-            local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
-            if bp then
-                local myPick = bp:FindFirstChildOfClass("Tool")
-                if myPick then myPick.Parent = char end
-            end
+        if tool then tool:Activate() end
+    end
+
+    -- LOGIC MAJU & PANJAT GUNUNG AFK (TERRAIN CARVER STEP-BY-STEP)
+    if State.AutoAdvanceMountain and State.AutoDig and hrp and hum then
+        local rayOrigin = hrp.Position
+        local rayDirection = flatDir * 3.5
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterAncestorsInstances = { char }
+        raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+
+        local result = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+        local stepUp = 0.15
+        if result then
+            stepUp = 0.45
+            hum.Jump = true
         end
 
-        -- LOGIC MAJU & PANJAT GUNUNG (CARVING TERRAIN FORWARD INTO MOUNTAIN)
-        if State.AutoAdvanceMountain and State.AutoDig then
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hrp and hum then
-                local lookDir = Camera.CFrame.LookVector
-                local flatDir = Vector3.new(lookDir.X, 0, lookDir.Z).Unit
-                if flatDir.Magnitude < 0.1 then flatDir = hrp.CFrame.LookVector end
-
-                local rayOrigin = hrp.Position
-                local rayDirection = flatDir * 3.5
-                local raycastParams = RaycastParams.new()
-                raycastParams.FilterAncestorsInstances = { char }
-                raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-
-                local result = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-                local stepUp = 0.15
-                if result then
-                    stepUp = 0.45
-                    hum.Jump = true
-                end
-
-                hrp.CFrame = hrp.CFrame + (flatDir * State.CarveSpeed) + Vector3.new(0, stepUp, 0)
-            end
-        end
+        -- Gerakkan Karakter Maju Step-by-Step ke Lereng Gunung
+        hrp.CFrame = hrp.CFrame + (flatDir * State.CarveSpeed) + Vector3.new(0, stepUp, 0)
     end
 
     if VirtualInputManager then
@@ -593,35 +577,8 @@ task.spawn(function()
 end)
 
 -- ===================================================================
--- PENCARIAN KRISTAL DENGAN FILTER KEBUN / PLOT PLAYER STRICT
+-- PENCARIAN & TELEPORT KRISTAL TERMAHAL LIAR (EXCLUDE PLOT)
 -- ===================================================================
-local function isInsidePlot(obj)
-    if not State.StrictPlotFilter then return false end
-    local current = obj
-    while current and current ~= Workspace do
-        local n = current.Name:lower()
-        if n:find("plot") or n:find("kebun") or n:find("garden") or n:find("farm") or n:find("base") or n:find("pajangan") or n:find("display") then
-            return true
-        end
-        current = current.Parent
-    end
-
-    local pos = obj:IsA("Model") and obj:GetPivot().Position or (obj:IsA("BasePart") and obj.Position)
-    if pos then
-        local plotsFolder = Workspace:FindFirstChild("Plots") or Workspace:FindFirstChild("Bases")
-        if plotsFolder then
-            for _, plot in ipairs(plotsFolder:GetChildren()) do
-                local plotPos = plot:IsA("Model") and plot:GetPivot().Position or (plot:IsA("BasePart") and plot.Position)
-                if plotPos and (pos - plotPos).Magnitude < 35 then
-                    return true
-                end
-            end
-        end
-    end
-
-    return false
-end
-
 local function findCrystalsInMap()
     local list = {}
     for _, obj in ipairs(Workspace:GetDescendants()) do
@@ -680,26 +637,25 @@ local function autoPickupGemLoop()
 end
 
 -- ===================================================================
--- AUTO-RETURN TO SELL DENGAN REMOTE REQUESTSELL ("ALL")
+-- AUTO-RETURN / INSTANT REMOTE SELL SAAT RANSEL PENUH
 -- ===================================================================
 local function executeAutoReturnToSell()
     if State.IsReturning then return end
     State.IsReturning = true
 
     if State.InstantRemoteSell then
-        -- Sell langsung dari posisi manapun tanpa perlu teleport ke toko!
         if Remotes.RequestSell then
             pcall(function() Remotes.RequestSell:FireServer("All") end)
             pcall(function() Remotes.RequestSell:FireServer() end)
         end
         State.CurrentBag = 0
-        WindUI:Notify({ Title = "⚡ Instant Sell (All)", Content = "Kristal dijual via Remote RequestSell('All')!", Duration = 2 })
+        WindUI:Notify({ Title = "⚡ Instant Sell (All)", Content = "Ransel Penuh! Kristal berhasil dijual via Remote!", Duration = 2 })
     else
         local char = LocalPlayer.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         if hrp then
             State.LastMiningPosition = hrp.CFrame
-            WindUI:Notify({ Title = "🎒 Tas Penuh!", Content = "Teleport ke Toko Jual (Sell)...", Duration = 3 })
+            WindUI:Notify({ Title = "🎒 Ransel Penuh!", Content = "Teleport ke Toko Jual (Sell)...", Duration = 3 })
 
             teleportTo(State.Waypoints["🏪 Toko Jual (Sell)"])
             task.wait(1.0)
@@ -733,7 +689,7 @@ task.spawn(function()
             end
         end
 
-        if (State.AutoMineMostExpensive or State.AutoMineGeneral) and not State.IsReturning then
+        if State.AutoMineMostExpensive and not State.IsReturning then
             local crystals = findCrystalsInMap()
             if #crystals > 0 then
                 local targetCrystal = crystals[1]
@@ -762,25 +718,6 @@ task.spawn(function()
             end
         end
         task.wait(0.2)
-    end
-end)
-
--- ===================================================================
--- SPECIAL REMOTES LOOPS (Jetpack, Plasma Drill, Radar)
--- ===================================================================
-task.spawn(function()
-    while true do
-        if State.JetpackThrust and Remotes.ThrustState then
-            pcall(function() Remotes.ThrustState:FireServer(true) end)
-        end
-        if State.AutoPlasmaDrill and Remotes.DrillEvent then
-            pcall(function() Remotes.DrillEvent:FireServer() end)
-        end
-        if State.AutoRadarPulse and Remotes.RadarUsed then
-            pcall(function() Remotes.RadarUsed:FireServer() end)
-            if Remotes.PowerFired then pcall(function() Remotes.PowerFired:FireServer() end) end
-        end
-        task.wait(0.15)
     end
 end)
 
@@ -1006,7 +943,7 @@ end)
 -- MEMBUAT WINDOW DAN 8 TABS LENGKAP DENGAN WINDUI
 -- ===================================================================
 local Window = WindUI:CreateWindow({
-    Title = "❄️ Antartica Mining Hub (v4.6)",
+    Title = "❄️ Antartica Mining Hub (v4.7)",
     Icon = "mountain",
     Author = "by Rhdevs",
     Folder = "AntarticaHub",
@@ -1077,8 +1014,8 @@ MoveTab:Toggle({
 local AutoTab = Window:Tab({ Title = "Mining & Dig", Icon = "zap" })
 
 AutoTab:Toggle({
-    Title = "⛏️ Auto Dig Continuous (Ketuk Gunung)",
-    Desc = "AFK Penggalian berulang di tebing gunung",
+    Title = "⛏️ Auto Dig Continuous (Vector3 DigRequest)",
+    Desc = "AFK Penggalian berulang di lereng gunung menggunakan Payload Vector3",
     Default = false,
     Callback = function(state) State.AutoDig = state end
 })
@@ -1098,78 +1035,8 @@ AutoTab:Slider({
     Callback = function(val) State.CarveSpeed = val end
 })
 
-AutoTab:Toggle({
-    Title = "💥 Aktifkan Pickaxe Power Boost",
-    Desc = "Meningkatkan daya hancur pickaxe",
-    Default = true,
-    Callback = function(state)
-        State.EnablePowerBoost = state
-        if state then boostPickaxePower() end
-    end
-})
-
-AutoTab:Slider({
-    Title = "⚡ Daya Hancur Pickaxe Boost",
-    Desc = "Atur nilai kekuatan hancur pickaxe (Default: 5.000)",
-    Step = 500,
-    Value = { Min = 500, Max = 20000, Default = 5000 },
-    Callback = function(val)
-        State.PickaxePowerBoost = val
-        if State.EnablePowerBoost then boostPickaxePower() end
-    end
-})
-
-AutoTab:Button({
-    Title = "⛏️ Auto Equip Pickaxe / Tool",
-    Desc = "Ambil pickaxe dari tas ke tangan secara otomatis",
-    Callback = function()
-        local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
-        local char = LocalPlayer.Character
-        if bp and char then
-            local tool = bp:FindFirstChildOfClass("Tool")
-            if tool then
-                tool.Parent = char
-                boostPickaxePower()
-                WindUI:Notify({ Title = "Tool Dipegang", Content = tool.Name .. " siap digunakan!", Duration = 2 })
-            end
-        end
-    end
-})
-
--- TAB 3: REMOTE HACKS & TOOLS
+-- TAB 3: REMOTE HACKS & UTILITIES (EVENT CLEANUP)
 local RemoteTab = Window:Tab({ Title = "Remote Hacks", Icon = "cpu" })
-
-RemoteTab:Toggle({
-    Title = "🚀 Jetpack Thrust Auto Boost",
-    Desc = "Memicu JetpackSystem.Remotes.ThrustState untuk terbang jetpack terus menerus",
-    Default = false,
-    Callback = function(state) State.JetpackThrust = state end
-})
-
-RemoteTab:Toggle({
-    Title = "⚡ Auto Plasma Drill Beam",
-    Desc = "Memicu DrillTools.Plasma Drill.DrillEvent secara otomatis",
-    Default = false,
-    Callback = function(state) State.AutoPlasmaDrill = state end
-})
-
-RemoteTab:Toggle({
-    Title = "📡 Auto Mining Radar Pulse",
-    Desc = "Memicu RadarRemotes.RadarUsed & PowerFired untuk memindai ore",
-    Default = false,
-    Callback = function(state) State.AutoRadarPulse = state end
-})
-
-RemoteTab:Button({
-    Title = "💣 Meledakkan Bom (Bomb Explode)",
-    Desc = "Panggil BombRemotes.Explode:FireServer()",
-    Callback = function()
-        if Remotes.ExplodeBomb then
-            pcall(function() Remotes.ExplodeBomb:FireServer() end)
-            WindUI:Notify({ Title = "Remote Bom", Content = "Remote Bomb Explode dipicu!", Duration = 2 })
-        end
-    end
-})
 
 RemoteTab:Button({
     Title = "🌟 Panggil Event Weather Starfall",
@@ -1296,7 +1163,7 @@ local BagTab = Window:Tab({ Title = "Bag & Crystals", Icon = "gem" })
 
 BagTab:Toggle({
     Title = "💎 Auto Mine Kristal Termahal (Liar)",
-    Desc = "Mencari & TP ke kristal termahal liar di gunung",
+    Desc = "Mencari & TP ke kristal termahal liar di gunung (Abaikan Plot)",
     Default = false,
     Callback = function(state) State.AutoMineMostExpensive = state end
 })
@@ -1309,10 +1176,17 @@ BagTab:Toggle({
 })
 
 BagTab:Toggle({
-    Title = "⚡ Instant Remote Sell (Tanpa TP ke Toko)",
-    Desc = "Jual langsung dari atas gunung via RequestSell('All') tanpa teleport balik",
+    Title = "⚡ Instant Remote Sell (RequestSell 'All')",
+    Desc = "Jual langsung dari mana saja via RequestSell('All') tanpa teleport balik",
     Default = true,
     Callback = function(state) State.InstantRemoteSell = state end
+})
+
+BagTab:Toggle({
+    Title = "🎒 Auto Sell Saat Ransel Penuh",
+    Desc = "Otomatis memicu RequestSell('All') saat ransel terdeteksi penuh",
+    Default = true,
+    Callback = function(state) State.AutoReturnWhenFull = state end
 })
 
 BagTab:Toggle({
@@ -1322,31 +1196,32 @@ BagTab:Toggle({
     Callback = function(state) State.AutoPickupGem = state end
 })
 
-BagTab:Dropdown({
-    Title = "Filter Kelangkaan (Rarity)",
-    Desc = "Pilih level kristal yang ingin diprioritaskan",
-    Values = { "Semua (All)", "Uncommon+", "Rare+", "Epic+", "Legendary+", "Mythic" },
-    Default = "Semua (All)",
-    Callback = function(val) State.SelectedRarityFilter = val end
-})
-
 BagTab:Toggle({
-    Title = "🎒 Auto Sell Saat Tas Penuh",
-    Desc = "Otomatis memicu RequestSell('All') saat tas penuh",
-    Default = true,
-    Callback = function(state) State.AutoReturnWhenFull = state end
+    Title = "🧹 Toggle Auto Ambil Kristal Plot (Wide Radius)",
+    Desc = "Otomatis menyedot kristal plot terus menerus dalam jangkauan luas",
+    Default = false,
+    Callback = function(state) State.AutoTakePlotCrystals = state end
 })
 
 BagTab:Slider({
-    Title = "Batas Kapasitas Tas (Manual Override)",
-    Desc = "Batas kapasitas tas jika tidak terdeteksi otomatis oleh GUI",
-    Step = 1,
-    Value = { Min = 5, Max = 100, Default = 20 },
-    Callback = function(val) State.MaxBagCapacity = val end
+    Title = "📡 Jangkauan Wide Radius Sedot Plot",
+    Desc = "Jarak radius menyedot kristal plot dari posisi berdiri (Default: 200)",
+    Step = 10,
+    Value = { Min = 50, Max = 500, Default = 200 },
+    Callback = function(val) State.PlotWideRadius = val end
 })
 
 BagTab:Button({
-    Title = "💰 Jual Semua Kristal Sekarang (RequestSell 'All')",
+    Title = "🥞 Tumpuk Kristal Bagus (Spam Posisi Saat Ini)",
+    Desc = "Memasang kristal terbaik dari tas menumpuk langsung di KOORDINAT BERDIRI KARAKTER saat ini",
+    Callback = function()
+        local count = stackGoodCrystalsAtCurrentPosition("Rare")
+        WindUI:Notify({ Title = "Plot Crystal Stacker", Content = string.format("Menumpuk %d kristal terbaik di posisi berdiri saat ini!", count), Duration = 3 })
+    end
+})
+
+BagTab:Button({
+    Title = "💰 Jual Semua Kristal Sekarang (Sell All)",
     Desc = "Memicu RemoteEvent GemRemotes.RequestSell:FireServer('All')",
     Callback = function()
         State.CurrentBag = 0
@@ -1355,24 +1230,6 @@ BagTab:Button({
             pcall(function() Remotes.RequestSell:FireServer() end)
         end
         WindUI:Notify({ Title = "Jual Kristal", Content = "Remote RequestSell('All') berhasil dipicu!", Duration = 2 })
-    end
-})
-
-BagTab:Button({
-    Title = "🧹 Ambil Semua Kristal di Plot Sendiri",
-    Desc = "Mengambil seluruh kristal yang terpajang di plot Anda",
-    Callback = function()
-        local count = takeAllPlotCrystals()
-        WindUI:Notify({ Title = "Plot Crystal", Content = string.format("Memproses pencabutan %d kristal dari plot...", count), Duration = 3 })
-    end
-})
-
-BagTab:Button({
-    Title = "🥞 Tumpuk Kristal Bagus (Luck Tinggi) di Plot",
-    Desc = "Memasang kristal terbaik (Rare/Epic/Legendary/Mythic) menumpuk di 1 titik plot sendiri",
-    Callback = function()
-        local count = stackGoodCrystalsOnMyPlot("Rare")
-        WindUI:Notify({ Title = "Plot Crystal Stacker", Content = string.format("Menumpuk %d kristal terbaik di plot sendiri!", count), Duration = 3 })
     end
 })
 
@@ -1536,9 +1393,9 @@ DevTab:Button({
     end
 })
 
-print("❄️ Antartica Mining Hub (v4.6 Plot Stacker & Sell All) Berhasil Dimuat!")
+print("❄️ Antartica Mining Hub (v4.7 Verified Edition) Berhasil Dimuat!")
 WindUI:Notify({
-    Title = "❄️ Antartica Hub v4.6 Active",
-    Content = "Instant Sell Remote ('All') + Plot Stacker Kristal Terbaik Ready!",
+    Title = "❄️ Antartica Hub v4.7 Active",
+    Content = "6 Poin Revisi ACC Ready (Dig Vector3, Wide Plot Toggle, Stacker Spam, Sell All)!",
     Duration = 4
 })
