@@ -30,9 +30,11 @@ local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local Camera = Workspace.CurrentCamera
 
--- VIRTUAL INPUT (Untuk Executor)
+-- VIRTUAL INPUT (Untuk Executor Mobile & PC)
 local VirtualInputManager = nil
 pcall(function() VirtualInputManager = game:GetService("VirtualInputManager") end)
+local VirtualUser = nil
+pcall(function() VirtualUser = game:GetService("VirtualUser") end)
 
 -- SAFE GUI CONTAINER
 local function getSafeGuiParent()
@@ -128,6 +130,9 @@ local State = {
     -- Auto Dig & Mountain Carver
     AutoDig = false,
     AutoAdvanceMountain = true,
+    CliffHugger = true,              -- Mode tempel & peluk tebing/gunung (STICK TO CLIFF)
+    CliffHugDistance = 2.6,          -- Jarak tempel ke dinding tebing (studs, default 2.6)
+    SpamScreenClick = true,          -- Spam klik layar / tap untuk mining
     CarveSpeed = 0.55,
     DigVectorDistance = 5,
     
@@ -852,8 +857,100 @@ local function scanAndShowTopCrystal()
 end
 
 -- ===================================================================
--- DIG ENGINE AFK DENGAN DETEKSI TERTIMBUN & SURFACE SNAPPING
+-- DIG ENGINE AFK DENGAN SPAM KLIK LAYAR, AUTO-EQUIP & SPATIAL HARVEST
 -- ===================================================================
+local function ensureMiningToolEquipped()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    local curTool = char:FindFirstChildOfClass("Tool")
+    if curTool then return curTool end
+
+    local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if bp and hum then
+        local targetTool = nil
+        for _, t in ipairs(bp:GetChildren()) do
+            if t:IsA("Tool") then
+                local tn = t.Name:lower()
+                if tn:find("pick") or tn:find("genesis") or tn:find("inti") or tn:find("mine") or tn:find("cangkul") or tn:find("alat") then
+                    targetTool = t
+                    break
+                end
+                if not targetTool then targetTool = t end
+            end
+        end
+        if targetTool then
+            hum:EquipTool(targetTool)
+            return targetTool
+        end
+    end
+    return nil
+end
+
+local function performScreenClickDig()
+    local tool = ensureMiningToolEquipped()
+    if tool then
+        pcall(function() tool:Activate() end)
+    end
+
+    local vp = Camera.ViewportSize
+    local clickX = vp.X * 0.5
+    local clickY = vp.Y * 0.5
+
+    -- 1. VirtualUser (Universil: Mobile Delta, Codex, Fluxus, Arceus & PC)
+    if VirtualUser then
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton1(Vector2.new(clickX, clickY))
+        end)
+    end
+
+    -- 2. VirtualInputManager (Khusus Executor PC)
+    if VirtualInputManager then
+        pcall(function()
+            VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
+            task.wait(0.005)
+            VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
+        end)
+    end
+end
+
+local function autoHarvestNearbyCrystals(hrp, radius)
+    radius = radius or 16
+    local char = LocalPlayer.Character
+    local overlapParams = OverlapParams.new()
+    overlapParams.FilterAncestorsInstances = { char }
+    overlapParams.FilterType = Enum.RaycastFilterType.Exclude
+
+    local nearbyParts = Workspace:GetPartBoundsInRadius(hrp.Position, radius, overlapParams)
+    local checkedInstances = {}
+
+    for _, part in ipairs(nearbyParts) do
+        local parentModel = part.Parent
+        local targetObj = (parentModel and parentModel ~= Workspace and parentModel:IsA("Model")) and parentModel or part
+        if not checkedInstances[targetObj] and not isInsidePlot(targetObj) then
+            checkedInstances[targetObj] = true
+
+            local prompt = targetObj:FindFirstChildOfClass("ProximityPrompt", true) or part:FindFirstChildOfClass("ProximityPrompt")
+            if prompt then
+                local act = (prompt.ActionText or ""):lower()
+                local objT = (prompt.ObjectText or ""):lower()
+                if act:find("ambil") or act:find("take") or objT:find("%$") or objT:find("kg") or isCrystalCandidate(targetObj) then
+                    pcall(function()
+                        if Remotes.DigRequest then Remotes.DigRequest:FireServer(part.Position) end
+                        if Remotes.MineHit then Remotes.MineHit:FireServer() end
+                    end)
+                    if type(fireproximityprompt) == "function" then
+                        pcall(function() fireproximityprompt(prompt) end)
+                    end
+                    if Remotes.PickupGem then pcall(function() Remotes.PickupGem:FireServer(targetObj) end) end
+                    if Remotes.GemCollected then pcall(function() Remotes.GemCollected:FireServer(targetObj) end) end
+                end
+            end
+        end
+    end
+end
+
 local function triggerDigAction()
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -864,27 +961,12 @@ local function triggerDigAction()
     local flatDir = Vector3.new(lookDir.X, 0, lookDir.Z).Unit
     if flatDir.Magnitude < 0.1 then flatDir = hrp.CFrame.LookVector end
 
-    -- 1. DETEKSI & AMBIL KRISTAL TERTIMBUN DI DEKAT PEMAIN (RADIUS 15 STUD)
-    -- HANYA proses objek non-karakter dan di luar plot
-    for _, prompt in ipairs(Workspace:GetDescendants()) do
-        if prompt:IsA("ProximityPrompt") then
-            local pPart = prompt.Parent
-            if pPart and not pPart:IsDescendantOf(char) and not isInsidePlot(pPart) then
-                local pPos = pPart:IsA("BasePart") and pPart.Position or (pPart:IsA("Model") and pPart:GetPivot().Position)
-                if pPos and (pPos - hrp.Position).Magnitude <= 15 then
-                    -- Bersihkan tanah timbunan di sekeliling kristal
-                    clearDirtAroundPosition(pPos, 2)
-                    if type(fireproximityprompt) == "function" then
-                        pcall(function() fireproximityprompt(prompt) end)
-                    end
-                    if Remotes.PickupGem then pcall(function() Remotes.PickupGem:FireServer(pPart) end) end
-                    if Remotes.GemCollected then pcall(function() Remotes.GemCollected:FireServer(pPart) end) end
-                end
-            end
-        end
+    -- 1. SPAM KLIK LAYAR & TOOL SWING UNTUK DIG
+    if State.SpamScreenClick then
+        performScreenClickDig()
     end
 
-    -- 2. PENGGALIAN NORMAL KE DEPAN LERENG GUNUNG (DIG REQUEST VECTOR3)
+    -- 2. PENGGALIAN NORMAL KE DEPAN LERENG GUNUNG (DIG REQUEST & MINE HIT REMOTES)
     local targetDigVector = hrp.Position + (flatDir * State.DigVectorDistance)
     if Remotes.DigRequest then
         pcall(function() Remotes.DigRequest:FireServer(targetDigVector) end)
@@ -893,53 +975,20 @@ local function triggerDigAction()
         pcall(function() Remotes.MineHit:FireServer() end)
     end
 
-    -- Pemicu Tool jika dipegang
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool then tool:Activate() end
-
-    -- 3. PERGERAKAN MAJU & PANJAT GUNUNG AFK: SURFACE SNAPPING MULUS (TIDAK FREEZE)
-    if State.AutoAdvanceMountain and State.AutoDig then
-        -- Gerakkan humanoid berjalan ke depan
-        hum:Move(flatDir, false)
-
-        local downParams = RaycastParams.new()
-        downParams.FilterAncestorsInstances = { char }
-        downParams.FilterType = Enum.RaycastFilterType.Exclude
-
-        -- Cek kontur tanah lereng di depan
-        local stepAheadPos = hrp.Position + (flatDir * State.CarveSpeed) + Vector3.new(0, 3.5, 0)
-        local groundHit = Workspace:Raycast(stepAheadPos, Vector3.new(0, -10, 0), downParams)
-        if groundHit then
-            local surfaceY = groundHit.Position.Y + 3.0
-            local targetPos = Vector3.new(stepAheadPos.X, surfaceY, stepAheadPos.Z)
-            -- Gunakan CFrame Lerp agar pergerakan tetap berkesinambungan dan tidak mereset fisika karakter
-            hrp.CFrame = hrp.CFrame:Lerp(CFrame.new(targetPos, targetPos + flatDir), 0.5)
-        else
-            -- Cek tebing di depan untuk lompat otomatis
-            local forwardHit = Workspace:Raycast(hrp.Position, flatDir * 3.5, downParams)
-            if forwardHit then
-                hum.Jump = true
-            end
-        end
-    end
-
-    if VirtualInputManager then
-        pcall(function()
-            local vp = Camera.ViewportSize
-            VirtualInputManager:SendMouseButtonEvent(vp.X * 0.85, vp.Y * 0.75, 0, true, game, 0)
-            task.wait(0.01)
-            VirtualInputManager:SendMouseButtonEvent(vp.X * 0.85, vp.Y * 0.75, 0, false, game, 0)
-        end)
-    end
+    -- 3. DETEKSI & AMBIL KRISTAL TERTIMBUN INSTAN (SPATIAL QUERY RADIUS 16 STUD)
+    autoHarvestNearbyCrystals(hrp, 16)
 end
 
 task.spawn(function()
     while true do
         if State.AutoDig then
-            triggerDigAction()
-            task.wait(0.08)
+            local ok, err = pcall(triggerDigAction)
+            if not ok then
+                warn("[Antartica AFK Error]:", err)
+            end
+            task.wait(0.06)
         else
-            task.wait(0.3)
+            task.wait(0.25)
         end
     end
 end)
@@ -1202,6 +1251,96 @@ RunService.Stepped:Connect(function()
 end)
 
 -- ===================================================================
+-- AFK CLIFF HUGGER ENGINE & ADVANCE MOUNTAIN (RUNSERVICE HEARTBEAT)
+-- ===================================================================
+RunService.Heartbeat:Connect(function()
+    if not State.AutoDig or State.Flying or State.IsSniping or State.IsReturning then return end
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum or hum.Health <= 0 then return end
+
+    local lookDir = Camera.CFrame.LookVector
+    local flatLook = Vector3.new(lookDir.X, 0, lookDir.Z).Unit
+    if flatLook.Magnitude < 0.1 then flatLook = hrp.CFrame.LookVector end
+
+    local rayParams = RaycastParams.new()
+    rayParams.FilterAncestorsInstances = { char }
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+    -- 1. DETEKSI DINDING TEBING GUNUNG (MULTI-RAYCAST)
+    local wallHit = nil
+    local minDist = 999
+    local testRays = {
+        flatLook * 14,
+        (flatLook - Vector3.new(0, 0.4, 0)).Unit * 14,
+        (flatLook + Vector3.new(0, 0.3, 0)).Unit * 14
+    }
+    for _, rayDir in ipairs(testRays) do
+        local r = Workspace:Raycast(hrp.Position, rayDir, rayParams)
+        if r and r.Instance and (r.Instance == Workspace.Terrain or not r.Instance:IsDescendantOf(char)) then
+            local dist = (r.Position - hrp.Position).Magnitude
+            if dist < minDist then
+                minDist = dist
+                wallHit = r
+            end
+        end
+    end
+
+    -- Raycast tanah ke bawah untuk menjaga elevasi kaki (anti jatuh ke void)
+    local groundHit = Workspace:Raycast(hrp.Position + Vector3.new(0, 2, 0), Vector3.new(0, -8, 0), rayParams)
+    local groundY = groundHit and (groundHit.Position.Y + 3.0) or hrp.Position.Y
+
+    if wallHit and State.CliffHugger then
+        -- ADA TEBING GUNUNG DI DEPAN: KUNCI KARAKTER MENEMPEL PADA PERMUKAAN TEBING
+        local curDist = (wallHit.Position - hrp.Position).Magnitude
+        local targetDist = State.CliffHugDistance or 2.6
+        local idealPos = wallHit.Position + (wallHit.Normal * targetDist)
+        local targetY = math.max(idealPos.Y, groundY)
+
+        if curDist > (targetDist + 0.3) then
+            -- Terlalu jauh dari tebing: Gerakkan maju dan tarik mendekati dinding tebing
+            local pullDir = (wallHit.Position - hrp.Position).Unit
+            hum:Move(pullDir, false)
+            hrp.AssemblyLinearVelocity = Vector3.new(pullDir.X * 18, hrp.AssemblyLinearVelocity.Y, pullDir.Z * 18)
+            local faceLook = (wallHit.Position - hrp.Position).Unit
+            hrp.CFrame = hrp.CFrame:Lerp(CFrame.new(Vector3.new(idealPos.X, targetY, idealPos.Z), hrp.Position + faceLook), 0.3)
+        elseif curDist < (targetDist - 0.5) then
+            -- Terlalu menusuk ke dalam tebing: Beri sedikit ruang agar tidak bug noclip tanah
+            hrp.CFrame = hrp.CFrame + (wallHit.Normal * 0.15)
+        else
+            -- JARAK MENEMPEL SEMPURNA (2.4 - 2.8 stud):
+            -- Selalu dorong pelan ke arah dinding agar tidak lepas
+            hum:Move(-wallHit.Normal, false)
+
+            if State.AutoAdvanceMountain then
+                -- Maju & panjat lereng tebing
+                local stepAheadPos = hrp.Position + (flatLook * State.CarveSpeed) + Vector3.new(0, 3.0, 0)
+                local slopeHit = Workspace:Raycast(stepAheadPos, Vector3.new(0, -7, 0), rayParams)
+                if slopeHit then
+                    local slopeY = slopeHit.Position.Y + 3.0
+                    local newTarget = Vector3.new(stepAheadPos.X, slopeY, stepAheadPos.Z)
+                    hrp.CFrame = hrp.CFrame:Lerp(CFrame.new(newTarget, newTarget + flatLook), 0.4)
+                else
+                    hum.Jump = true
+                    hrp.AssemblyLinearVelocity = Vector3.new(flatLook.X * 12, hrp.AssemblyLinearVelocity.Y, flatLook.Z * 12)
+                end
+            end
+        end
+    else
+        -- Belum ada tebing di depan: Bergerak maju menuju gunung jika AutoAdvance aktif
+        if State.AutoAdvanceMountain then
+            hum:Move(flatLook, false)
+            hrp.AssemblyLinearVelocity = Vector3.new(flatLook.X * 16, hrp.AssemblyLinearVelocity.Y, flatLook.Z * 16)
+            if groundHit then
+                local snapPos = Vector3.new(hrp.Position.X, groundY, hrp.Position.Z)
+                hrp.CFrame = hrp.CFrame:Lerp(CFrame.new(snapPos, snapPos + flatLook), 0.3)
+            end
+        end
+    end
+end)
+
+-- ===================================================================
 -- FLY ENGINE & ERGONOMIC D-PAD CONTROLS
 -- ===================================================================
 local dpadParent = getSafeGuiParent()
@@ -1445,29 +1584,51 @@ MoveTab:Toggle({
 local AutoTab = Window:Tab({ Title = "Mining & Dig", Icon = "zap" })
 
 AutoTab:Toggle({
-    Title = "⛏️ Auto Dig Continuous (Vector3 DigRequest)",
-    Desc = "AFK Penggalian berulang di lereng gunung menggunakan Payload Vector3",
+    Title = "⛏️ Auto Dig & Spam Layar (AFK Mining)",
+    Desc = "AFK Mining otomatis: Spam klik layar + Tool Swing + Payload DigRequest",
     Default = false,
     Callback = function(state) State.AutoDig = state end
 })
 
 AutoTab:Toggle({
-    Title = "🧗 Maju & Panjat Gunung (Surface Snapping)",
-    Desc = "Karakter otomatis MAJU & MEMANJAT permukaan tanah lereng gunung tanpa tembus void",
+    Title = "🧗 Tempel & Peluk Tebing Gunung (Cliff Hugger)",
+    Desc = "Karakter MENEMPEL KETAT di permukaan dinding tebing gunung (agar kristal selalu muncul!)",
+    Default = true,
+    Callback = function(state) State.CliffHugger = state end
+})
+
+AutoTab:Toggle({
+    Title = "🧗 Maju & Panjat Lereng (Auto Climb)",
+    Desc = "Karakter otomatis melangkah maju & memanjat kontur lereng gunung tanpa jatuh void",
     Default = true,
     Callback = function(state) State.AutoAdvanceMountain = state end
 })
 
+AutoTab:Toggle({
+    Title = "🖱️ Spam Klik Layar Otomatis",
+    Desc = "Simulasi tap layar / klik mouse otomatis untuk memicu ayunan alat tambang",
+    Default = true,
+    Callback = function(state) State.SpamScreenClick = state end
+})
+
 AutoTab:Slider({
-    Title = "⚡ Kecepatan Maju Carve Gunung",
-    Desc = "Atur seberapa jauh langkah maju setiap kali ketukan dig",
+    Title = "🧲 Jarak Tempel Tebing (Studs)",
+    Desc = "Jarak ideal menempel ke dinding tebing (Default: 2.6 studs)",
+    Step = 0.1,
+    Value = { Min = 1.5, Max = 5.0, Default = 2.6 },
+    Callback = function(val) State.CliffHugDistance = val end
+})
+
+AutoTab:Slider({
+    Title = "⚡ Kecepatan Maju Panjat Gunung",
+    Desc = "Atur kecepatan melangkah maju setiap ketukan galian",
     Step = 0.05,
-    Value = { Min = 0.1, Max = 1.2, Default = 0.55 },
+    Value = { Min = 0.1, Max = 1.5, Default = 0.55 },
     Callback = function(val) State.CarveSpeed = val end
 })
 
 AutoTab:Slider({
-    Title = "📏 Jarak Galian Dig ke Depan",
+    Title = "📏 Jarak Jangkauan Dig ke Depan",
     Desc = "Jarak jangkauan titik penggalian dari posisi karakter (studs)",
     Step = 1,
     Value = { Min = 2, Max = 15, Default = 5 },
