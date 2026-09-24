@@ -1,6 +1,6 @@
 --[[
     ===================================================================
-    ❄️ ANTARTICA HUB - MOUNTAIN MINING & UTILITY (v4.5 Mountain Carver Edition)
+    ❄️ ANTARTICA HUB - MOUNTAIN MINING & UTILITY (v4.6 Plot Stacker & Sell All)
     ===================================================================
     UI Library: WindUI (https://github.com/Footagesus/WindUI)
     Dibuat untuk: Owner Game, Map Tester & Player (Roblox Mountain Mining)
@@ -10,7 +10,7 @@
       2. ⛏️ Mining & Dig (Auto Dig + Maju Hancurkan Gunung, Power Boost Slider 20k, Auto Equip)
       3. ⚡ Remote Hacks (Jetpack Thrust, Plasma Drill, Bomb Explode, Radar Pulse, Starfall, Meteor, Code Redeem)
       4. 👥 Target Player (Player List Dropdown, Refresh List, TP to Target, Auto Follow/Spectate)
-      5. 🎒 Bag & Gems (Auto Mine Termahal, Filter Plot Kebun Strict, Magnet Gem, Auto Return)
+      5. 🎒 Bag & Crystals (Auto Mine Termahal, Filter Plot Strict, Instant Sell All, Ambil & Tumpuk Kristal Plot)
       6. 📍 Teleports & Shops (TP & Buka UI Toko Jual, Bom, Pickaxe, Upgrade, Radar, Peak, CFrame Copy)
       7. ☀️ Map Inspector (TimeOfDay Slider 0-24, Fullbright, No Fog, Infinite Jump)
       8. 🔍 Dev Scanner (Scan Remotes ke File/Clipboard, Count Crystals, Open Shop UI Remote Test)
@@ -81,7 +81,7 @@ local function copyToRealClipboard(text)
     return copied
 end
 
-saveLocalFile("antartica_logs.txt", "=== Antartica Hub v4.5 Mountain Carver Edition Dijalankan ===", true)
+saveLocalFile("antartica_logs.txt", "=== Antartica Hub v4.6 Plot Stacker & Sell All Edition Dijalankan ===", true)
 
 -- ===================================================================
 -- LOAD WINDUI LIBRARY
@@ -127,7 +127,7 @@ local State = {
     
     -- Auto Dig & Mountain Carver
     AutoDig = false,
-    AutoAdvanceMountain = true, -- Maju & Panjat gunung saat AFK dig
+    AutoAdvanceMountain = true,
     CarveSpeed = 0.45,
     PickaxePowerBoost = 5000,
     EnablePowerBoost = true,
@@ -136,7 +136,6 @@ local State = {
     JetpackThrust = false,
     AutoPlasmaDrill = false,
     AutoRadarPulse = false,
-    AutoUsePotions = false,
 
     -- Target Player
     SelectedPlayerName = nil,
@@ -146,11 +145,12 @@ local State = {
     AutoMineMostExpensive = false,
     AutoMineGeneral = false,
     AutoPickupGem = true,
-    StrictPlotFilter = true, -- Filter kebun player strictly
+    StrictPlotFilter = true,
     SelectedRarityFilter = "Semua (All)",
     CurrentBag = 0,
     MaxBagCapacity = 20,
     AutoReturnWhenFull = true,
+    InstantRemoteSell = true, -- Instant Sell tanpa perlu TP jika berada di atas gunung
     IsReturning = false,
     
     -- Waypoints Toko Asli
@@ -212,6 +212,12 @@ local Remotes = {
     BoulderBroken     = ReplicatedStorage:FindFirstChild("BoulderRemotes") and ReplicatedStorage.BoulderRemotes:FindFirstChild("Broken"),
     GroupVerify       = ReplicatedStorage:FindFirstChild("GroupRewardRemotes") and ReplicatedStorage.GroupRewardRemotes:FindFirstChild("Verify"),
     AdminAbuseTrigger = ReplicatedStorage:FindFirstChild("AdminAbuseRemotes") and ReplicatedStorage.AdminAbuseRemotes:FindFirstChild("Trigger"),
+    
+    -- PLOT REMOTES (PLACE, TAKE, CONFIG)
+    PlaceCrystal      = ReplicatedStorage:FindFirstChild("PlotRemotes") and ReplicatedStorage.PlotRemotes:FindFirstChild("PlaceCrystal"),
+    TakeCrystal       = ReplicatedStorage:FindFirstChild("PlotRemotes") and ReplicatedStorage.PlotRemotes:FindFirstChild("TakeCrystal"),
+    TakeOut           = ReplicatedStorage:FindFirstChild("PlotRemotes") and ReplicatedStorage.PlotRemotes:FindFirstChild("TakeOut"),
+    PopulatePlot      = ReplicatedStorage:FindFirstChild("PlotRemotes") and ReplicatedStorage.PlotRemotes:FindFirstChild("Populate"),
 }
 
 -- ===================================================================
@@ -263,6 +269,141 @@ local function openShopUIByName(keywords, targetCFrame)
             end
         end
     end
+end
+
+-- ===================================================================
+-- FUNGSI DETEKSI PLOT SENDIRI & MANAJEMEN KRISTAL PLOT
+-- ===================================================================
+local function getMyPlot()
+    local plotsFolder = Workspace:FindFirstChild("Plots") or Workspace:FindFirstChild("Bases") or Workspace:FindFirstChild("Kebun")
+    if plotsFolder then
+        for _, plot in ipairs(plotsFolder:GetChildren()) do
+            local owner = plot:FindFirstChild("Owner") or plot:GetAttribute("Owner")
+            if (owner and (owner.Value == LocalPlayer or owner.Value == LocalPlayer.Name or owner == LocalPlayer.Name)) or plot.Name:find(LocalPlayer.Name) then
+                return plot
+            end
+        end
+
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local closestPlot = nil
+            local minDist = 9999
+            for _, plot in ipairs(plotsFolder:GetChildren()) do
+                local pos = plot:IsA("Model") and plot:GetPivot().Position or (plot:IsA("BasePart") and plot.Position)
+                if pos then
+                    local dist = (hrp.Position - pos).Magnitude
+                    if dist < minDist then
+                        minDist = dist
+                        closestPlot = plot
+                    end
+                end
+            end
+            if minDist < 100 then return closestPlot end
+        end
+    end
+    return nil
+end
+
+local function takeAllPlotCrystals()
+    local myPlot = getMyPlot()
+    local count = 0
+    if myPlot then
+        for _, obj in ipairs(myPlot:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") then
+                pcall(function() fireproximityprompt(obj) end)
+                count = count + 1
+            elseif obj:IsA("BasePart") or obj:IsA("Model") then
+                local crystalId = obj:GetAttribute("Id") or obj:GetAttribute("CrystalId") or tonumber(obj.Name)
+                if crystalId then
+                    if Remotes.TakeCrystal then pcall(function() Remotes.TakeCrystal:FireServer(crystalId) end) end
+                    if Remotes.TakeOut then pcall(function() Remotes.TakeOut:FireServer(crystalId) end) end
+                    count = count + 1
+                end
+            end
+        end
+    else
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if obj:IsA("ProximityPrompt") then
+                    local pPos = obj.Parent and obj.Parent:IsA("BasePart") and obj.Parent.Position
+                    if pPos and (pPos - hrp.Position).Magnitude < 40 then
+                        pcall(function() fireproximityprompt(obj) end)
+                        count = count + 1
+                    end
+                end
+            end
+        end
+    end
+    return count
+end
+
+local function stackGoodCrystalsOnMyPlot(minRarityName)
+    minRarityName = minRarityName or "Rare"
+    local rarityRank = {
+        ["Mythic"] = 6,
+        ["Legendary"] = 5,
+        ["Epic"] = 4,
+        ["Rare"] = 3,
+        ["Uncommon"] = 2,
+        ["Common"] = 1
+    }
+    local minRank = rarityRank[minRarityName] or 3
+
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return 0 end
+
+    local myPlot = getMyPlot()
+    local baseVector = hrp.Position + (hrp.CFrame.LookVector * 4)
+    if myPlot then
+        local pPos = myPlot:IsA("Model") and myPlot:GetPivot().Position or (myPlot:IsA("BasePart") and myPlot.Position)
+        if pPos then baseVector = pPos + Vector3.new(0, 3, 0) end
+    end
+
+    local itemsToPlace = {}
+    local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
+    if bp then
+        for _, item in ipairs(bp:GetChildren()) do
+            local iName = item.Name:lower()
+            local rRank = 1
+            for rName, rVal in pairs(State.RarityConfig) do
+                if iName:find(rName:lower()) then
+                    rRank = rVal.Priority
+                    break
+                end
+            end
+
+            local itemLuck = item:GetAttribute("Luck") or item:GetAttribute("Rarity")
+            if type(itemLuck) == "number" and itemLuck > 10 then
+                rRank = math.max(rRank, 4)
+            end
+
+            if rRank >= minRank then
+                local crystalId = item:GetAttribute("Id") or item:GetAttribute("CrystalId") or tonumber(item.Name) or item
+                table.insert(itemsToPlace, { Item = item, Id = crystalId, Rank = rRank })
+            end
+        end
+    end
+
+    table.sort(itemsToPlace, function(a, b) return a.Rank > b.Rank end)
+
+    local placedCount = 0
+    for index, data in ipairs(itemsToPlace) do
+        -- Tumpuk di posisi Vector3 yang sama dengan sedikit offset ketinggian Y (bertumpuk rapi)
+        local stackPos = Vector3.new(baseVector.X, baseVector.Y + ((index - 1) * 0.35), baseVector.Z)
+        if Remotes.PlaceCrystal then
+            pcall(function()
+                Remotes.PlaceCrystal:FireServer(data.Id, stackPos)
+            end)
+            placedCount = placedCount + 1
+            task.wait(0.08)
+        end
+    end
+
+    return placedCount
 end
 
 -- ===================================================================
@@ -408,12 +549,10 @@ local function triggerDigAction()
             local hrp = char:FindFirstChild("HumanoidRootPart")
             local hum = char:FindFirstChildOfClass("Humanoid")
             if hrp and hum then
-                -- Maju searah pandangan kamera/karakter menuju tebing
                 local lookDir = Camera.CFrame.LookVector
                 local flatDir = Vector3.new(lookDir.X, 0, lookDir.Z).Unit
                 if flatDir.Magnitude < 0.1 then flatDir = hrp.CFrame.LookVector end
 
-                -- Cek apakah ada dinding gunung di depan via Raycast
                 local rayOrigin = hrp.Position
                 local rayDirection = flatDir * 3.5
                 local raycastParams = RaycastParams.new()
@@ -423,12 +562,10 @@ local function triggerDigAction()
                 local result = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
                 local stepUp = 0.15
                 if result then
-                    -- Ada tebing/tanah gunung di depan! Panjat ke atas tebing sambil menghancurkan
                     stepUp = 0.45
                     hum.Jump = true
                 end
 
-                -- Geser posisi CFrame karakter maju ke dalam gunung
                 hrp.CFrame = hrp.CFrame + (flatDir * State.CarveSpeed) + Vector3.new(0, stepUp, 0)
             end
         end
@@ -469,7 +606,6 @@ local function isInsidePlot(obj)
         current = current.Parent
     end
 
-    -- Cek juga jarak ke Plot dasar jika ada folder Plot di Workspace
     local pos = obj:IsA("Model") and obj:GetPivot().Position or (obj:IsA("BasePart") and obj.Position)
     if pos then
         local plotsFolder = Workspace:FindFirstChild("Plots") or Workspace:FindFirstChild("Bases")
@@ -544,30 +680,43 @@ local function autoPickupGemLoop()
 end
 
 -- ===================================================================
--- AUTO-RETURN TO SELL
+-- AUTO-RETURN TO SELL DENGAN REMOTE REQUESTSELL ("ALL")
 -- ===================================================================
 local function executeAutoReturnToSell()
     if State.IsReturning then return end
     State.IsReturning = true
 
-    local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        State.LastMiningPosition = hrp.CFrame
-        WindUI:Notify({ Title = "🎒 Tas Penuh!", Content = "Teleport ke Toko Jual (Sell)...", Duration = 3 })
-
-        teleportTo(State.Waypoints["🏪 Toko Jual (Sell)"])
-        task.wait(1.0)
-
-        openShopUIByName({ "sell", "jual", "seller" })
-        if Remotes.RequestSell then pcall(function() Remotes.RequestSell:FireServer() end) end
-
+    if State.InstantRemoteSell then
+        -- Sell langsung dari posisi manapun tanpa perlu teleport ke toko!
+        if Remotes.RequestSell then
+            pcall(function() Remotes.RequestSell:FireServer("All") end)
+            pcall(function() Remotes.RequestSell:FireServer() end)
+        end
         State.CurrentBag = 0
-        task.wait(1.5)
+        WindUI:Notify({ Title = "⚡ Instant Sell (All)", Content = "Kristal dijual via Remote RequestSell('All')!", Duration = 2 })
+    else
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            State.LastMiningPosition = hrp.CFrame
+            WindUI:Notify({ Title = "🎒 Tas Penuh!", Content = "Teleport ke Toko Jual (Sell)...", Duration = 3 })
 
-        if State.LastMiningPosition then
-            teleportTo(State.LastMiningPosition)
-            WindUI:Notify({ Title = "💎 Lanjut Menambang", Content = "Kembali ke posisi gunung sebelumnya!", Duration = 2 })
+            teleportTo(State.Waypoints["🏪 Toko Jual (Sell)"])
+            task.wait(1.0)
+
+            openShopUIByName({ "sell", "jual", "seller" })
+            if Remotes.RequestSell then
+                pcall(function() Remotes.RequestSell:FireServer("All") end)
+                pcall(function() Remotes.RequestSell:FireServer() end)
+            end
+
+            State.CurrentBag = 0
+            task.wait(1.5)
+
+            if State.LastMiningPosition then
+                teleportTo(State.LastMiningPosition)
+                WindUI:Notify({ Title = "💎 Lanjut Menambang", Content = "Kembali ke posisi gunung sebelumnya!", Duration = 2 })
+            end
         end
     end
     State.IsReturning = false
@@ -857,11 +1006,11 @@ end)
 -- MEMBUAT WINDOW DAN 8 TABS LENGKAP DENGAN WINDUI
 -- ===================================================================
 local Window = WindUI:CreateWindow({
-    Title = "❄️ Antartica Mining Hub (v4.5)",
+    Title = "❄️ Antartica Mining Hub (v4.6)",
     Icon = "mountain",
     Author = "by Rhdevs",
     Folder = "AntarticaHub",
-    Size = UDim2.fromOffset(650, 510),
+    Size = UDim2.fromOffset(660, 520),
     Theme = "Dark",
 })
 
@@ -987,7 +1136,7 @@ AutoTab:Button({
     end
 })
 
--- TAB 3: REMOTE HACKS & TOOLS (DAPATKAN FITUR REMOTES DARI EVENT.TXT)
+-- TAB 3: REMOTE HACKS & TOOLS
 local RemoteTab = Window:Tab({ Title = "Remote Hacks", Icon = "cpu" })
 
 RemoteTab:Toggle({
@@ -1142,7 +1291,7 @@ PlayerTab:Toggle({
     Callback = function(state) State.LoopFollowPlayer = state end
 })
 
--- TAB 5: BAG & CRYSTALS
+-- TAB 5: BAG & CRYSTALS & PLOT STACKER
 local BagTab = Window:Tab({ Title = "Bag & Crystals", Icon = "gem" })
 
 BagTab:Toggle({
@@ -1157,6 +1306,13 @@ BagTab:Toggle({
     Desc = "Mengabaikan kristal di dalam area plot/kebun milik pemain lain",
     Default = true,
     Callback = function(state) State.StrictPlotFilter = state end
+})
+
+BagTab:Toggle({
+    Title = "⚡ Instant Remote Sell (Tanpa TP ke Toko)",
+    Desc = "Jual langsung dari atas gunung via RequestSell('All') tanpa teleport balik",
+    Default = true,
+    Callback = function(state) State.InstantRemoteSell = state end
 })
 
 BagTab:Toggle({
@@ -1175,8 +1331,8 @@ BagTab:Dropdown({
 })
 
 BagTab:Toggle({
-    Title = "🎒 Auto Return ke Toko Jual Saat Tas Penuh",
-    Desc = "Otomatis TP jual saat tas penuh, lalu kembali menambang",
+    Title = "🎒 Auto Sell Saat Tas Penuh",
+    Desc = "Otomatis memicu RequestSell('All') saat tas penuh",
     Default = true,
     Callback = function(state) State.AutoReturnWhenFull = state end
 })
@@ -1190,12 +1346,33 @@ BagTab:Slider({
 })
 
 BagTab:Button({
-    Title = "💰 Jual Semua Kristal Sekarang (Sell All)",
-    Desc = "Memicu RemoteEvent jual kristal di toko",
+    Title = "💰 Jual Semua Kristal Sekarang (RequestSell 'All')",
+    Desc = "Memicu RemoteEvent GemRemotes.RequestSell:FireServer('All')",
     Callback = function()
         State.CurrentBag = 0
-        if Remotes.RequestSell then pcall(function() Remotes.RequestSell:FireServer() end) end
-        WindUI:Notify({ Title = "Jual Kristal", Content = "RemoteEvent jual telah dipicu!", Duration = 2 })
+        if Remotes.RequestSell then
+            pcall(function() Remotes.RequestSell:FireServer("All") end)
+            pcall(function() Remotes.RequestSell:FireServer() end)
+        end
+        WindUI:Notify({ Title = "Jual Kristal", Content = "Remote RequestSell('All') berhasil dipicu!", Duration = 2 })
+    end
+})
+
+BagTab:Button({
+    Title = "🧹 Ambil Semua Kristal di Plot Sendiri",
+    Desc = "Mengambil seluruh kristal yang terpajang di plot Anda",
+    Callback = function()
+        local count = takeAllPlotCrystals()
+        WindUI:Notify({ Title = "Plot Crystal", Content = string.format("Memproses pencabutan %d kristal dari plot...", count), Duration = 3 })
+    end
+})
+
+BagTab:Button({
+    Title = "🥞 Tumpuk Kristal Bagus (Luck Tinggi) di Plot",
+    Desc = "Memasang kristal terbaik (Rare/Epic/Legendary/Mythic) menumpuk di 1 titik plot sendiri",
+    Callback = function()
+        local count = stackGoodCrystalsOnMyPlot("Rare")
+        WindUI:Notify({ Title = "Plot Crystal Stacker", Content = string.format("Menumpuk %d kristal terbaik di plot sendiri!", count), Duration = 3 })
     end
 })
 
@@ -1359,9 +1536,9 @@ DevTab:Button({
     end
 })
 
-print("❄️ Antartica Mining Hub (v4.5 Mountain Carver & Remote Hacks) Berhasil Dimuat!")
+print("❄️ Antartica Mining Hub (v4.6 Plot Stacker & Sell All) Berhasil Dimuat!")
 WindUI:Notify({
-    Title = "❄️ Antartica Hub v4.5 Active",
-    Content = "8 Tab WindUI Lengkap + Mountain Carver + 103 Remotes Hacks Ready!",
+    Title = "❄️ Antartica Hub v4.6 Active",
+    Content = "Instant Sell Remote ('All') + Plot Stacker Kristal Terbaik Ready!",
     Duration = 4
 })
