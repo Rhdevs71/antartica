@@ -1740,6 +1740,7 @@ BagTab:Button({
         if Remotes.RequestSell then
             pcall(function() Remotes.RequestSell:FireServer("All") end)
             pcall(function() Remotes.RequestSell:FireServer() end)
+        end
         WindUI:Notify({ Title = "Jual Kristal", Content = "Remote RequestSell('All') berhasil dipicu!", Duration = 2 })
     end
 })
