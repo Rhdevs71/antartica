@@ -163,8 +163,6 @@ local State = {
     SnipeMaxHP = math.huge,
     SnipeMaxHPDisplay = "Semua HP (Bebas)",
     ApplyMaxHPToAutoMine = true,
-    IgnoreContestedCrystals = true,
-    ContestedPlayerRadius = 22,
     AutoClearDirtRadius = 15,
     IsSniping = false,
     
@@ -700,27 +698,6 @@ local function parseCrystalHP(text, obj)
     local curHP = 0
     local maxHP = 0
 
-    if not text or text == "" then
-        text = ""
-        if obj then
-            local prompt = obj:IsA("ProximityPrompt") and obj or obj:FindFirstChildOfClass("ProximityPrompt", true)
-            if prompt then
-                text = (prompt.ObjectText or "") .. " " .. (prompt.ActionText or "") .. " " .. obj.Name
-            else
-                text = obj.Name
-            end
-            for _, desc in ipairs(obj:GetDescendants()) do
-                if desc:IsA("BillboardGui") or desc:IsA("SurfaceGui") then
-                    for _, lbl in ipairs(desc:GetDescendants()) do
-                        if lbl:IsA("TextLabel") and lbl.Text ~= "" then
-                            text = text .. " " .. lbl.Text
-                        end
-                    end
-                end
-            end
-        end
-    end
-
     if text and text ~= "" then
         for num1, num2 in text:gmatch("([%d%.,%a]+)%s*/%s*([%d%.,%a]+)") do
             local low1 = num1:lower()
@@ -770,78 +747,6 @@ local function parseCrystalHP(text, obj)
     end
 
     return curHP, maxHP
-end
-
-local _blacklistedCrystals = {}
-local _minedCrystals = {}
-local _blacklistedPositions = {}
-local _minedPositions = {}
-
-local function isPosCooldown(tbl, pos, radius)
-    radius = radius or 6
-    if not pos then return false end
-    local now = tick()
-    for i = #tbl, 1, -1 do
-        local entry = tbl[i]
-        if now > entry.exp then
-            table.remove(tbl, i)
-        else
-            if (pos - entry.pos).Magnitude <= radius then
-                return true
-            end
-        end
-    end
-    return false
-end
-
-local function addPosCooldown(tbl, pos, duration)
-    if not pos then return end
-    table.insert(tbl, { pos = pos, exp = tick() + duration })
-end
-
-local function isCrystalContested(pos, radius)
-    radius = radius or 22
-    if not pos then return false end
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character then
-            local oHrp = p.Character:FindFirstChild("HumanoidRootPart")
-            if oHrp and (oHrp.Position - pos).Magnitude <= radius then
-                return true, p.DisplayName or p.Name
-            end
-        end
-    end
-    return false
-end
-
-local function passesCrystalFilters(info, bypassHp)
-    if not info or not info.Instance then return false end
-    local now = tick()
-
-    if _minedCrystals[info.Instance] and now < _minedCrystals[info.Instance] then
-        return false
-    end
-    if isPosCooldown(_minedPositions, info.Position, 6) then
-        return false
-    end
-
-    if not bypassHp and _blacklistedCrystals[info.Instance] and now < _blacklistedCrystals[info.Instance] then
-        return false
-    end
-    if not bypassHp and isPosCooldown(_blacklistedPositions, info.Position, 6) then
-        return false
-    end
-
-    if not bypassHp and State.SnipeMaxHP and State.SnipeMaxHP > 0 and State.SnipeMaxHP ~= math.huge and info.MaxHP > 0 then
-        if info.MaxHP > State.SnipeMaxHP or info.CurrentHP > State.SnipeMaxHP then
-            return false
-        end
-    end
-
-    if State.IgnoreContestedCrystals and info.IsContested then
-        return false
-    end
-
-    return true
 end
 
 local function extractCrystalInfo(obj)
@@ -907,10 +812,9 @@ local function extractCrystalInfo(obj)
         if attrL then luckVal = tonumber(attrL) or 0 end
     end
 
-    -- Ekstrak HP Kristal & Status Ditambang Player Lain
+    -- Ekstrak HP Kristal
     local curHP, maxHP = parseCrystalHP(fullText, obj)
-    local hpDisplay = (maxHP > 0) and string.format("%s / %s", formatCompactNumber(curHP), formatCompactNumber(maxHP)) or "Bebas / Instan"
-    local isContested, minerName = isCrystalContested(cf.Position, State.ContestedPlayerRadius or 22)
+    local hpDisplay = (maxHP > 0) and string.format("%s / %s", formatCompactNumber(curHP), formatCompactNumber(maxHP)) or "Bebas"
 
     -- Nama Tampilan
     local displayName = obj.Name
@@ -933,28 +837,19 @@ local function extractCrystalInfo(obj)
         Luck = luckVal,
         CurrentHP = curHP,
         MaxHP = maxHP,
-        HPDisplay = hpDisplay,
-        IsContested = isContested,
-        MinerName = minerName
+        HPDisplay = hpDisplay
     }
 end
 
 -- ===================================================================
 -- PENCARIAN KRISTAL GLOBAL MAP (EXCLUDE PLOT & EXCLUDE DROP SENDIRI)
 -- ===================================================================
-local function findCrystalsInMap(bypassHp)
-    if bypassHp == nil then bypassHp = true end
+-- ===================================================================
+-- PENCARIAN KRISTAL GLOBAL MAP (EXCLUDE PLOT & EXCLUDE DROP SENDIRI)
+-- ===================================================================
+local function findCrystalsInMap()
     local list = {}
     local searched = {}
-
-    local function processObj(crystalObj)
-        if not crystalObj or searched[crystalObj] or isInsidePlot(crystalObj) then return end
-        searched[crystalObj] = true
-        local info = extractCrystalInfo(crystalObj)
-        if info and passesCrystalFilters(info, bypassHp) then
-            table.insert(list, info)
-        end
-    end
 
     -- 1. CARI SEMUA PROXIMITYPROMPT DI WORKSPACE (CARA PALING PRESISI UNTUK KRISTAL GAME INI)
     for _, prompt in ipairs(Workspace:GetDescendants()) do
@@ -964,8 +859,12 @@ local function findCrystalsInMap(bypassHp)
             -- Kristal di game ini memiliki prompt bertuliskan "AMBIL" atau mengandung "$" atau "KG"
             if act:find("ambil") or act:find("take") or objT:find("%$") or objT:find("kg") or objT:find("kilogram") then
                 local crystalObj = prompt.Parent
-                if crystalObj then
-                    processObj(crystalObj)
+                if crystalObj and not searched[crystalObj] and not isInsidePlot(crystalObj) then
+                    searched[crystalObj] = true
+                    local info = extractCrystalInfo(crystalObj)
+                    if info then
+                        table.insert(list, info)
+                    end
                 end
             end
         end
@@ -984,8 +883,12 @@ local function findCrystalsInMap(bypassHp)
         if folder then
             for _, obj in ipairs(folder:GetChildren()) do
                 if (obj:IsA("Model") or obj:IsA("BasePart")) and not searched[obj] then
-                    if isCrystalCandidate(obj) then
-                        processObj(obj)
+                    if isCrystalCandidate(obj) and not isInsidePlot(obj) then
+                        searched[obj] = true
+                        local info = extractCrystalInfo(obj)
+                        if info then
+                            table.insert(list, info)
+                        end
                     end
                 end
             end
@@ -1010,8 +913,7 @@ end
 -- SCAN & TAMPILKAN KRISTAL TERMAHAL DI MAP (NOTIFIKASI WINDUI)
 -- ===================================================================
 local function scanAndShowTopCrystal()
-    local bypassHp = not State.ApplyMaxHPToAutoMine
-    local crystals = findCrystalsInMap(bypassHp)
+    local crystals = findCrystalsInMap()
     if #crystals == 0 then
         WindUI:Notify({
             Title = "🔍 Scan Map",
@@ -1022,11 +924,10 @@ local function scanAndShowTopCrystal()
     end
 
     local top = crystals[1]
-    local extra = top.IsContested and string.format("\n⚠️ Ditambang: %s", top.MinerName or "Player Lain") or ""
     WindUI:Notify({
         Title = "💎 Kristal Termahal di Map!",
-        Content = string.format("Nama: %s\nHarga: %s\nHP: %s\nUkuran: %s\nBobot: %.1f KG\nLuck: +%.1f%%%s",
-            top.Name, top.PriceDisplay, top.HPDisplay or "Bebas", top.SizeName, top.Weight, top.Luck, extra),
+        Content = string.format("Nama: %s\nHarga: %s\nHP: %s\nUkuran: %s\nBobot: %.1f KG\nLuck: +%.1f%%",
+            top.Name, top.PriceDisplay, top.HPDisplay or "Bebas", top.SizeName, top.Weight, top.Luck),
         Duration = 6
     })
 end
@@ -1177,18 +1078,18 @@ local function autoSnipeGlobalLoop()
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
-    local crystals = findCrystalsInMap(false)
+    local crystals = findCrystalsInMap()
     if #crystals == 0 then return end
 
     for _, c in ipairs(crystals) do
-        if not State.AutoSnipeGlobal or State.IsReturning then break end
+        if not State.AutoSnipeGlobal then break end
 
         local passPrice = (c.Price >= State.SnipeMinPrice)
         local passSize = (c.SizeRank >= State.SnipeMinSizeRank)
         local passLuck = (c.Luck >= State.SnipeMinLuck)
-        local passFilters = passesCrystalFilters(c, false)
+        local passHP = (State.SnipeMaxHP == math.huge) or (c.MaxHP == 0) or (c.MaxHP <= State.SnipeMaxHP)
 
-        if passPrice and passSize and passLuck and passFilters then
+        if passPrice and passSize and passLuck and passHP then
             State.IsSniping = true
             State.LastMiningPosition = hrp.CFrame
 
@@ -1199,52 +1100,18 @@ local function autoSnipeGlobalLoop()
             })
 
             teleportTo(c.CFrame + Vector3.new(0, 1.5, -2))
-            task.wait(0.25)
-
-            -- Cek ulang HP di dekat kristal jika sebelumnya belum terbaca dari jauh
-            local _, liveMax = parseCrystalHP(nil, c.Instance)
-            if liveMax > 0 and State.SnipeMaxHP and State.SnipeMaxHP > 0 and State.SnipeMaxHP ~= math.huge and liveMax > State.SnipeMaxHP then
-                _blacklistedCrystals[c.Instance] = tick() + 60
-                addPosCooldown(_blacklistedPositions, c.Position, 60)
-                WindUI:Notify({
-                    Title = "🛡️ Melewati Kristal (HP Tebal)",
-                    Content = string.format("HP %s melebihi batas %s!", formatCompactNumber(liveMax), State.SnipeMaxHPDisplay or "Batas"),
-                    Duration = 2
-                })
-                task.wait(0.8)
-                State.IsSniping = false
-                break
-            end
+            task.wait(0.2)
 
             -- Bersihkan tanah timbunan di sekeliling kristal
-            clearDirtAroundPosition(c.Position, 3)
+            clearDirtAroundPosition(c.Position, 4)
             task.wait(0.1)
 
-            -- Tambang sampai kristal hancur (atau batas waktu 25 detik)
-            local startMine = tick()
-            while (tick() - startMine) < 25 do
-                if not State.AutoSnipeGlobal or not c.Instance or not c.Instance.Parent or not c.Instance:IsDescendantOf(Workspace) then
-                    break
-                end
-
-                local tool = ensureMiningToolEquipped()
-                if tool then pcall(function() tool:Activate() end) end
-                if Remotes.DigRequest then pcall(function() Remotes.DigRequest:FireServer(c.Position) end) end
-                if Remotes.MineHit then pcall(function() Remotes.MineHit:FireServer() end) end
-                performScreenClickDig()
-
-                if c.Prompt and type(fireproximityprompt) == "function" then
-                    pcall(function() fireproximityprompt(c.Prompt) end)
-                end
-                if Remotes.PickupGem then pcall(function() Remotes.PickupGem:FireServer(c.Instance) end) end
-                if Remotes.GemCollected then pcall(function() Remotes.GemCollected:FireServer(c.Instance) end) end
-
-                autoHarvestNearbyCrystals(hrp, 14)
-                task.wait(0.12)
+            if c.Prompt and type(fireproximityprompt) == "function" then
+                pcall(function() fireproximityprompt(c.Prompt) end)
             end
+            if Remotes.PickupGem then pcall(function() Remotes.PickupGem:FireServer(c.Instance) end) end
+            if Remotes.GemCollected then pcall(function() Remotes.GemCollected:FireServer(c.Instance) end) end
 
-            _minedCrystals[c.Instance] = tick() + 30
-            addPosCooldown(_minedPositions, c.Position, 30)
             task.wait(0.3)
             State.IsSniping = false
             break
@@ -1377,57 +1244,21 @@ task.spawn(function()
 
         -- TP KE KRISTAL TERMAHAL
         if State.AutoMineMostExpensive and not State.IsReturning and not State.IsSniping then
-            local bypassHp = not State.ApplyMaxHPToAutoMine
-            local crystals = findCrystalsInMap(bypassHp)
+            local crystals = findCrystalsInMap()
             if #crystals > 0 then
-                local targetCrystal = crystals[1]
-                State.IsSniping = true
-                teleportTo(targetCrystal.CFrame + Vector3.new(0, 1.5, -2))
-                task.wait(0.25)
-
-                local _, liveMax = parseCrystalHP(nil, targetCrystal.Instance)
-                if not bypassHp and liveMax > 0 and State.SnipeMaxHP and State.SnipeMaxHP > 0 and State.SnipeMaxHP ~= math.huge and liveMax > State.SnipeMaxHP then
-                    _blacklistedCrystals[targetCrystal.Instance] = tick() + 60
-                    addPosCooldown(_blacklistedPositions, targetCrystal.Position, 60)
-                    WindUI:Notify({
-                        Title = "🛡️ Melewati Kristal (HP Tebal)",
-                        Content = string.format("HP %s melebihi batas %s!", formatCompactNumber(liveMax), State.SnipeMaxHPDisplay or "Batas"),
-                        Duration = 2
-                    })
-                    task.wait(0.8)
-                    State.IsSniping = false
-                else
-                    clearDirtAroundPosition(targetCrystal.Position, 3)
-                    task.wait(0.1)
-
-                    local startMine = tick()
-                    while (tick() - startMine) < 25 do
-                        if not State.AutoMineMostExpensive or not targetCrystal.Instance or not targetCrystal.Instance.Parent or not targetCrystal.Instance:IsDescendantOf(Workspace) then
-                            break
-                        end
-
-                        local tool = ensureMiningToolEquipped()
-                        if tool then pcall(function() tool:Activate() end) end
-                        if Remotes.DigRequest then pcall(function() Remotes.DigRequest:FireServer(targetCrystal.Position) end) end
-                        if Remotes.MineHit then pcall(function() Remotes.MineHit:FireServer() end) end
-                        performScreenClickDig()
-
+                for _, targetCrystal in ipairs(crystals) do
+                    local passHP = not State.ApplyMaxHPToAutoMine or (State.SnipeMaxHP == math.huge) or (targetCrystal.MaxHP == 0) or (targetCrystal.MaxHP <= State.SnipeMaxHP)
+                    if passHP then
+                        teleportTo(targetCrystal.CFrame + Vector3.new(0, 1.5, -2))
+                        clearDirtAroundPosition(targetCrystal.Position, 3)
+                        
                         if targetCrystal.Prompt and type(fireproximityprompt) == "function" then
                             pcall(function() fireproximityprompt(targetCrystal.Prompt) end)
                         end
                         if Remotes.PickupGem then pcall(function() Remotes.PickupGem:FireServer(targetCrystal.Instance) end) end
                         if Remotes.GemCollected then pcall(function() Remotes.GemCollected:FireServer(targetCrystal.Instance) end) end
-
-                        local curChar = LocalPlayer.Character
-                        local curHrp = curChar and curChar:FindFirstChild("HumanoidRootPart")
-                        if curHrp then autoHarvestNearbyCrystals(curHrp, 14) end
-                        task.wait(0.12)
+                        break
                     end
-
-                    _minedCrystals[targetCrystal.Instance] = tick() + 30
-                    addPosCooldown(_minedPositions, targetCrystal.Position, 30)
-                    task.wait(0.3)
-                    State.IsSniping = false
                 end
             end
         end
@@ -2117,7 +1948,7 @@ local maxHpMap = {
 
 BagTab:Dropdown({
     Title = "🩸 Maks. HP Kristal (Max HP Filter)",
-    Desc = "Abaikan kristal dengan HP di atas batas kemampuan pickaxe",
+    Desc = "Filter batas maksimal HP kristal yang diambil",
     Values = { "Semua HP (Bebas)", "1M HP", "5M HP", "10M HP", "50M HP", "100M HP", "300M HP", "500M HP", "1B HP" },
     Default = "Semua HP (Bebas)",
     Callback = function(val)
@@ -2128,16 +1959,9 @@ BagTab:Dropdown({
 
 BagTab:Toggle({
     Title = "🩸 Terapkan Batas HP ke Auto Mine Termahal",
-    Desc = "Membatasi HP kristal yang ditambang sesuai batas HP yang dipilih",
+    Desc = "Batasi HP kristal termahal sesuai batas HP yang dipilih",
     Default = true,
     Callback = function(state) State.ApplyMaxHPToAutoMine = state end
-})
-
-BagTab:Toggle({
-    Title = "👥 Lewati Kristal Sedang Ditambang Player Lain",
-    Desc = "Mengabaikan kristal jika ada pemain lain di dekatnya",
-    Default = true,
-    Callback = function(state) State.IgnoreContestedCrystals = state end
 })
 
 BagTab:Button({
