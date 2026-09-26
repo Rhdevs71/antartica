@@ -1,16 +1,16 @@
 --[[
     ===================================================================
-    ❄️ ANTARTICA HUB - MOUNTAIN MINING & UTILITY (v5.0 Sultan Sniper & Excavation Release)
+    ❄️ ANTARTICA HUB - MOUNTAIN MINING & UTILITY (v5.1 Cliff Climber & Recovery Release)
     ===================================================================
     UI Library: WindUI (https://github.com/Footagesus/WindUI)
     Dibuat untuk: Owner Game, Map Tester & Player (Roblox Mountain Mining)
     
     Kelengkapan Tab WindUI (8 Tabs Lengkap):
       1. 🏃 Movement (Fly Toggle, D-Pad Toggle, Fly Speed, WalkSpeed, GodMode, Anti-Fall, Noclip)
-      2. ⛏️ Mining & Dig (Auto Dig + Vector3 DigRequest, Surface Snapping Terrain Carver, Auto-Clear Dirt)
+      2. ⛏️ Mining & Dig (Auto Dig, Unified Cliff Climber, Fall Recovery Engine Beta)
       3. ⚡ Remote Hacks (Starfall, Meteor Event, Mountain Regen, Super Luck, Redeem Code)
-      4. 👥 Target Player (Player List, TP to Target, Auto Follow, Bring Player Test)
-      5. 🎒 Bag & Crystals (Global Sultan Sniper $1k-$1Qa, Size & Luck Filter, Equip-Drop Plot Stacker)
+      4. 👥 Target Player (Player List, TP to Target, Auto Follow)
+      5. 🎒 Bag & Crystals (Global Sultan Sniper $1k-$1Qa, High-Luck Equip-Click Plot Stacker, Instant Auto-Sell)
       6. 📍 Teleports & Shops (TP & Buka UI Toko Jual, Bom, Pickaxe, Upgrade, Radar, Peak, CFrame Copy)
       7. ☀️ Map Inspector (TimeOfDay Slider 0-24, Fullbright, No Fog, Infinite Jump)
       8. 🔍 Dev Scanner (Scan Remotes ke File/Clipboard, Count Crystals, Open Shop UI Remote Test)
@@ -129,12 +129,21 @@ local State = {
     
     -- Auto Dig & Mountain Carver
     AutoDig = false,
-    AutoAdvanceMountain = true,
-    CliffHugger = true,              -- Mode tempel & peluk tebing/gunung (STICK TO CLIFF)
+    AutoCliffClimber = true,         -- Mode panjat & tempel tebing gunung (CLIFF CLIMBER & HUGGER)
+    CliffHugger = true,              -- Alias kompatibilitas
+    AutoAdvanceMountain = true,      -- Alias kompatibilitas
     CliffHugDistance = 2.6,          -- Jarak tempel ke dinding tebing (studs, default 2.6)
-    SpamScreenClick = true,          -- Spam klik layar / tap untuk mining
+    ClimbSpeed = 0.55,               -- Kecepatan panjat lereng gunung
     CarveSpeed = 0.55,
+    SpamScreenClick = true,          -- Spam klik layar / tap untuk mining otomatis
     DigVectorDistance = 5,
+
+    -- Deteksi Jatuh & Auto Recovery Puncak (Beta)
+    AutoFallRecovery = true,         -- Merekam ketinggian puncak & auto recovery jika terjatuh
+    FallThreshold = 35,              -- Jarak toleransi penurunan dari puncak (studs)
+    MaxPeakAltitudeY = -999999,      -- Catatan ketinggian puncak tertinggi
+    MaxPeakCFrame = nil,             -- Titik koordinat CFrame puncak tertinggi
+    LastAltitudeUI = "0m",
     
     -- Target Player
     SelectedPlayerName = nil,
@@ -148,7 +157,6 @@ local State = {
     CurrentBag = 0,
     MaxBagCapacity = 60000,
     AutoReturnWhenFull = false,
-    InstantRemoteSell = true,
     IsReturning = false,
     LastSellTick = 0,
 
@@ -414,6 +422,40 @@ end)
 -- ===================================================================
 -- TUMPUK KRISTAL DI PLOT: EQUIP-THEN-DROP (SESUAI MEKANISME GAME)
 -- ===================================================================
+local function parseLuck(str)
+    if not str then return 0 end
+    local clean = tostring(str)
+    local lStr = clean:match("[Kk]eberuntungan:%s*%+?([%d%.]+)") or clean:match("%+([%d%.]+)%%") or clean:match("[Ll]uck:%s*%+?([%d%.]+)")
+    if lStr then
+        return tonumber(lStr) or 0
+    end
+    return 0
+end
+
+local function getToolLuck(tool)
+    if not tool then return 0 end
+    local l = parseLuck(tool.Name)
+    if l > 0 then return l end
+    local attrL = tool:GetAttribute("Luck") or tool:GetAttribute("Keberuntungan") or tool:GetAttribute("LuckPercent")
+    if attrL then
+        local num = tonumber(attrL)
+        if num and num > 0 then return num end
+        l = parseLuck(attrL)
+        if l > 0 then return l end
+    end
+    if tool.ToolTip and tool.ToolTip ~= "" then
+        l = parseLuck(tool.ToolTip)
+        if l > 0 then return l end
+    end
+    for _, desc in ipairs(tool:GetDescendants()) do
+        if desc:IsA("TextLabel") and desc.Text ~= "" then
+            l = parseLuck(desc.Text)
+            if l > 0 then return l end
+        end
+    end
+    return 0
+end
+
 local function stackGoodCrystalsAtCurrentPosition()
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -454,8 +496,13 @@ local function stackGoodCrystalsAtCurrentPosition()
         end
     end
 
-    -- Sortir: Kristal dengan bobot (KG) terbesar atau Luck tertinggi didahulukan
+    -- Sortir: Kristal dengan Keberuntungan (Luck) tertinggi didahulukan, lalu bobot (KG) terbesar
     table.sort(itemsToPlace, function(a, b)
+        local luckA = getToolLuck(a)
+        local luckB = getToolLuck(b)
+        if luckA ~= luckB then
+            return luckA > luckB
+        end
         local wA = tonumber(a.Name:match("([%d%.]+)")) or a:GetAttribute("Weight") or 0
         local wB = tonumber(b.Name:match("([%d%.]+)")) or b:GetAttribute("Weight") or 0
         return wA > wB
@@ -480,13 +527,19 @@ local function stackGoodCrystalsAtCurrentPosition()
         -- 1. WAJIB PEGANG (EQUIP) KRISTAL KE TANGAN SEBELUM DROP/PLACE KE PLOT
         if tool.Parent == bp then
             hum:EquipTool(tool)
-            task.wait(0.18)
+            task.wait(0.15)
         end
+
+        -- 2. LANGSUNG KLIK / AKTIVASI TOOL KRISTAL DI TANGAN
+        pcall(function()
+            tool:Activate()
+        end)
+        task.wait(0.06)
 
         local crystalId = tool:GetAttribute("Id") or tool:GetAttribute("CrystalId") or tonumber(tool.Name:match("%d+")) or State.ManualCrystalId or 2481
         local stackPos = Vector3.new(currentStandPos.X, currentStandPos.Y + ((index - 1) * 0.35), currentStandPos.Z)
 
-        -- 2. Pemicu Place & Drop ke Plot
+        -- 3. Pemicu Place & Drop di Sekitaran Posisi Berdiri Karakter
         if Remotes.PlaceCrystal then
             pcall(function() Remotes.PlaceCrystal:FireServer(crystalId, stackPos) end)
         end
@@ -498,7 +551,7 @@ local function stackGoodCrystalsAtCurrentPosition()
         task.wait(0.12)
     end
 
-    -- 3. Kembalikan pegangan ke Pickaxe Tambang Utama
+    -- 4. Kembalikan pegangan ke Pickaxe Tambang Utama
     if originalPickaxe and originalPickaxe.Parent == bp then
         hum:EquipTool(originalPickaxe)
     end
@@ -665,15 +718,7 @@ local function parseSizeRank(str)
     return 1, "Normal"
 end
 
-local function parseLuck(str)
-    if not str then return 0 end
-    local clean = tostring(str)
-    local lStr = clean:match("[Kk]eberuntungan:%s*%+?([%d%.]+)") or clean:match("%+([%d%.]+)%%")
-    if lStr then
-        return tonumber(lStr) or 0
-    end
-    return 0
-end
+
 
 local function isCrystalCandidate(obj)
     if not obj or obj == Workspace.Terrain then return false end
@@ -1181,45 +1226,19 @@ local function autoPickupGemLoop()
 end
 
 -- ===================================================================
--- AUTO-RETURN / INSTANT REMOTE SELL SAAT RANSEL PENUH
+-- AUTO SELL INSTAN SAAT RANSEL PENUH
 -- ===================================================================
 local function executeAutoReturnToSell()
-    if State.IsReturning or (tick() - State.LastSellTick < 6) then return end
+    if State.IsReturning or (tick() - State.LastSellTick < 4) then return end
     State.IsReturning = true
     State.LastSellTick = tick()
 
-    if State.InstantRemoteSell then
-        if Remotes.RequestSell then
-            pcall(function() Remotes.RequestSell:FireServer("All") end)
-            pcall(function() Remotes.RequestSell:FireServer() end)
-        end
-        State.CurrentBag = 0
-        WindUI:Notify({ Title = "⚡ Instant Sell (All)", Content = "Ransel Penuh! Kristal berhasil dijual via Remote!", Duration = 2 })
-    else
-        local char = LocalPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            State.LastMiningPosition = hrp.CFrame
-            WindUI:Notify({ Title = "🎒 Ransel Penuh!", Content = "Teleport ke Toko Jual (Sell)...", Duration = 3 })
-
-            teleportTo(State.Waypoints["🏪 Toko Jual (Sell)"])
-            task.wait(1.0)
-
-            openShopUIByName({ "sell", "jual", "seller" })
-            if Remotes.RequestSell then
-                pcall(function() Remotes.RequestSell:FireServer("All") end)
-                pcall(function() Remotes.RequestSell:FireServer() end)
-            end
-
-            State.CurrentBag = 0
-            task.wait(1.5)
-
-            if State.LastMiningPosition then
-                teleportTo(State.LastMiningPosition)
-                WindUI:Notify({ Title = "💎 Lanjut Menambang", Content = "Kembali ke posisi gunung sebelumnya!", Duration = 2 })
-            end
-        end
+    if Remotes.RequestSell then
+        pcall(function() Remotes.RequestSell:FireServer("All") end)
+        pcall(function() Remotes.RequestSell:FireServer() end)
     end
+    State.CurrentBag = 0
+    WindUI:Notify({ Title = "⚡ Auto Sell Instan", Content = "Ransel Penuh! Semua kristal berhasil dijual via Remote!", Duration = 2 })
     State.IsReturning = false
 end
 
@@ -1267,7 +1286,7 @@ task.spawn(function()
 end)
 
 -- ===================================================================
--- PLAYER TARGET & FOLLOW & EXPERIMENTAL BRING PLAYER LOOP
+-- PLAYER TARGET & FOLLOW LOOP
 -- ===================================================================
 task.spawn(function()
     while true do
@@ -1333,10 +1352,12 @@ RunService.Stepped:Connect(function()
 end)
 
 -- ===================================================================
--- AFK CLIFF HUGGER ENGINE & ADVANCE MOUNTAIN (RUNSERVICE HEARTBEAT)
+-- AFK CLIFF CLIMBER & HUGGER ENGINE (RUNSERVICE HEARTBEAT)
 -- ===================================================================
 RunService.Heartbeat:Connect(function()
     if not State.AutoDig or State.Flying or State.IsSniping or State.IsReturning then return end
+    if not State.AutoCliffClimber and not State.CliffHugger and not State.AutoAdvanceMountain then return end
+
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -1350,13 +1371,13 @@ RunService.Heartbeat:Connect(function()
     rayParams.FilterAncestorsInstances = { char }
     rayParams.FilterType = Enum.RaycastFilterType.Exclude
 
-    -- 1. DETEKSI DINDING TEBING GUNUNG (MULTI-RAYCAST)
+    -- 1. DETEKSI DINDING TEBING GUNUNG DI DEPAN (MULTI-RAYCAST)
     local wallHit = nil
     local minDist = 999
     local testRays = {
-        flatLook * 14,
-        (flatLook - Vector3.new(0, 0.4, 0)).Unit * 14,
-        (flatLook + Vector3.new(0, 0.3, 0)).Unit * 14
+        flatLook * 12,
+        (flatLook - Vector3.new(0, 0.35, 0)).Unit * 12,
+        (flatLook + Vector3.new(0, 0.35, 0)).Unit * 12
     }
     for _, rayDir in ipairs(testRays) do
         local r = Workspace:Raycast(hrp.Position, rayDir, rayParams)
@@ -1369,54 +1390,129 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
-    -- Raycast tanah ke bawah untuk menjaga elevasi kaki (anti jatuh ke void)
-    local groundHit = Workspace:Raycast(hrp.Position + Vector3.new(0, 2, 0), Vector3.new(0, -8, 0), rayParams)
-    local groundY = groundHit and (groundHit.Position.Y + 3.0) or hrp.Position.Y
+    local targetDist = State.CliffHugDistance or 2.6
+    local climbSpeed = State.CarveSpeed or State.ClimbSpeed or 0.55
 
-    if wallHit and State.CliffHugger then
-        -- ADA TEBING GUNUNG DI DEPAN: KUNCI KARAKTER MENEMPEL PADA PERMUKAAN TEBING
+    if wallHit then
         local curDist = (wallHit.Position - hrp.Position).Magnitude
-        local targetDist = State.CliffHugDistance or 2.6
-        local idealPos = wallHit.Position + (wallHit.Normal * targetDist)
-        local targetY = math.max(idealPos.Y, groundY)
+        local wallNormal = wallHit.Normal
+        local pullDir = -wallNormal
 
-        if curDist > (targetDist + 0.3) then
-            -- Terlalu jauh dari tebing: Gerakkan maju dan tarik mendekati dinding tebing
-            local pullDir = (wallHit.Position - hrp.Position).Unit
-            hum:Move(pullDir, false)
-            hrp.AssemblyLinearVelocity = Vector3.new(pullDir.X * 18, hrp.AssemblyLinearVelocity.Y, pullDir.Z * 18)
-            local faceLook = (wallHit.Position - hrp.Position).Unit
-            hrp.CFrame = hrp.CFrame:Lerp(CFrame.new(Vector3.new(idealPos.X, targetY, idealPos.Z), hrp.Position + faceLook), 0.3)
-        elseif curDist < (targetDist - 0.5) then
-            -- Terlalu menusuk ke dalam tebing: Beri sedikit ruang agar tidak bug noclip tanah
-            hrp.CFrame = hrp.CFrame + (wallHit.Normal * 0.15)
+        -- Selalu arahkan karakter menempel rapat ke dinding tebing
+        hum:Move(pullDir, false)
+
+        if curDist > (targetDist + 0.4) then
+            -- Jarak terlalu jauh: dorong mendekati dinding tebing
+            local approachVel = pullDir * 14
+            hrp.AssemblyLinearVelocity = Vector3.new(approachVel.X, hrp.AssemblyLinearVelocity.Y, approachVel.Z)
+        elseif curDist < (targetDist - 0.4) then
+            -- Terlalu menusuk ke dalam tebing: beri sedikit dorongan keluar agar tidak noclip
+            local repulseVel = wallNormal * 8
+            hrp.AssemblyLinearVelocity = Vector3.new(repulseVel.X, hrp.AssemblyLinearVelocity.Y, repulseVel.Z)
+        end
+
+        -- Mekanisme Panjat Lereng:
+        -- Raycast cek elevasi pijakan di depan
+        local stepOrigin = hrp.Position + (flatLook * 1.5) + Vector3.new(0, 4.0, 0)
+        local slopeHit = Workspace:Raycast(stepOrigin, Vector3.new(0, -6.0, 0), rayParams)
+
+        if slopeHit and slopeHit.Position.Y > (hrp.Position.Y - 1.0) then
+            -- Lereng naik terdeteksi di depan: beri dorongan lompat/naik dan dorong maju
+            hum.Jump = true
+            local forwardUp = (flatLook * 10) + Vector3.new(0, 16, 0)
+            hrp.AssemblyLinearVelocity = Vector3.new(forwardUp.X, math.clamp(hrp.AssemblyLinearVelocity.Y + 2.5, -4, 22), forwardUp.Z)
         else
-            -- JARAK MENEMPEL SEMPURNA (2.4 - 2.8 stud):
-            -- Selalu dorong pelan ke arah dinding agar tidak lepas
-            hum:Move(-wallHit.Normal, false)
+            -- Menempel pada dinding terjal/lereng curam: beri gaya panjat ke atas konstan
+            local climbThrust = math.clamp(climbSpeed * 30, 12, 26)
+            hrp.AssemblyLinearVelocity = Vector3.new(pullDir.X * 6 + flatLook.X * 8, climbThrust, pullDir.Z * 6 + flatLook.Z * 8)
+            hum.Jump = true
+        end
+    else
+        -- Belum ada tebing di depan: melangkah maju mencari tebing gunung
+        hum:Move(flatLook, false)
+        local moveVel = flatLook * 14
+        hrp.AssemblyLinearVelocity = Vector3.new(moveVel.X, hrp.AssemblyLinearVelocity.Y, moveVel.Z)
+    end
+end)
 
-            if State.AutoAdvanceMountain then
-                -- Maju & panjat lereng tebing
-                local stepAheadPos = hrp.Position + (flatLook * State.CarveSpeed) + Vector3.new(0, 3.0, 0)
-                local slopeHit = Workspace:Raycast(stepAheadPos, Vector3.new(0, -7, 0), rayParams)
-                if slopeHit then
-                    local slopeY = slopeHit.Position.Y + 3.0
-                    local newTarget = Vector3.new(stepAheadPos.X, slopeY, stepAheadPos.Z)
-                    hrp.CFrame = hrp.CFrame:Lerp(CFrame.new(newTarget, newTarget + flatLook), 0.4)
-                else
-                    hum.Jump = true
-                    hrp.AssemblyLinearVelocity = Vector3.new(flatLook.X * 12, hrp.AssemblyLinearVelocity.Y, flatLook.Z * 12)
+-- ===================================================================
+-- DETEKSI JATUH & AUTO RECOVERY KETINGGIAN TERTINGGI (BETA)
+-- ===================================================================
+local function scanGameAltitudeUI()
+    local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if not pg then return nil end
+
+    for _, lbl in ipairs(pg:GetDescendants()) do
+        if lbl:IsA("TextLabel") and lbl.Visible and lbl.Text ~= "" then
+            local pName = lbl.Parent and lbl.Parent.Name:lower() or ""
+            local ancestorGui = lbl:FindFirstAncestorOfClass("ScreenGui")
+            local guiName = ancestorGui and ancestorGui.Name:lower() or ""
+            if not guiName:find("wind") and not guiName:find("antartica") and not pName:find("wind") and not pName:find("antartica") then
+                local txt = lbl.Text
+                -- Format ketinggian game asli: "1240m", "1,240 m", "Altitude: 1240", "Height: 500"
+                local altNum = txt:match("([%d%,%.]+)%s*[mM]") or txt:match("[Aa]ltitude:%s*([%d%,%.]+)") or txt:match("[Hh]eight:%s*([%d%,%.]+)") or txt:match("[Kk]etinggian:%s*([%d%,%.]+)")
+                if altNum then
+                    local clean = altNum:gsub(",", "")
+                    local num = tonumber(clean)
+                    if num and num > 0 and num ~= State.CurrentBag and num ~= State.MaxBagCapacity then
+                        return string.format("%.0fm", num)
+                    end
                 end
             end
         end
-    else
-        -- Belum ada tebing di depan: Bergerak maju menuju gunung jika AutoAdvance aktif
-        if State.AutoAdvanceMountain then
-            hum:Move(flatLook, false)
-            hrp.AssemblyLinearVelocity = Vector3.new(flatLook.X * 16, hrp.AssemblyLinearVelocity.Y, flatLook.Z * 16)
-            if groundHit then
-                local snapPos = Vector3.new(hrp.Position.X, groundY, hrp.Position.Z)
-                hrp.CFrame = hrp.CFrame:Lerp(CFrame.new(snapPos, snapPos + flatLook), 0.3)
+    end
+    return nil
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.15)
+        if State.AutoFallRecovery then
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+            if hrp and hum and hum.Health > 0 and not State.Flying and not State.IsSniping and not State.IsReturning then
+                local curY = hrp.Position.Y
+                local rayParams = RaycastParams.new()
+                rayParams.FilterAncestorsInstances = { char }
+                rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+                -- Cek apakah karakter sedang berpijak di tanah / tebing
+                local groundCheck = Workspace:Raycast(hrp.Position, Vector3.new(0, -6, 0), rayParams)
+                local isGrounded = groundCheck and (hum:GetState() ~= Enum.HumanoidStateType.Freefall)
+
+                -- 1. UPDATE KETINGGIAN PUNCAK TERTINGGI JIKA SEDANG MENDAKI/BERPIJAK
+                if isGrounded then
+                    if curY > State.MaxPeakAltitudeY then
+                        State.MaxPeakAltitudeY = curY
+                        State.MaxPeakCFrame = hrp.CFrame
+                    end
+                end
+
+                -- 2. DETEKSI JATUH DARI PUNCAK
+                if State.MaxPeakCFrame and State.MaxPeakAltitudeY > -900000 then
+                    local dropDistance = State.MaxPeakAltitudeY - curY
+                    local vy = hrp.AssemblyLinearVelocity.Y
+                    local isFreefalling = (vy < -22) or (hum:GetState() == Enum.HumanoidStateType.Freefall)
+
+                    if dropDistance >= (State.FallThreshold or 35) and isFreefalling then
+                        -- Pulihkan karakter kembali ke puncak tertinggi
+                        hrp.AssemblyLinearVelocity = Vector3.zero
+                        hrp.AssemblyAngularVelocity = Vector3.zero
+                        hrp.CFrame = State.MaxPeakCFrame + Vector3.new(0, 3.5, 0)
+
+                        local uiAlt = scanGameAltitudeUI()
+                        local altInfo = uiAlt and string.format(" (UI: %s)", uiAlt) or ""
+
+                        WindUI:Notify({
+                            Title = "🛡️ Auto Recovery (Anti-Jatuh)",
+                            Content = string.format("Terdeteksi jatuh (-%.0f studs)! Berhasil dipulihkan ke puncak Y: %.1f%s", dropDistance, State.MaxPeakAltitudeY, altInfo),
+                            Duration = 3
+                        })
+                        task.wait(1.2)
+                    end
+                end
             end
         end
     end
@@ -1669,28 +1765,54 @@ AutoTab:Toggle({
     Title = "⛏️ Auto Dig & Spam Layar (AFK Mining)",
     Desc = "AFK Mining otomatis: Spam klik layar + Tool Swing + Payload DigRequest",
     Default = false,
-    Callback = function(state) State.AutoDig = state end
+    Callback = function(state)
+        State.AutoDig = state
+        State.SpamScreenClick = state
+    end
 })
 
 AutoTab:Toggle({
-    Title = "🧗 Tempel & Peluk Tebing Gunung (Cliff Hugger)",
-    Desc = "Karakter MENEMPEL KETAT di permukaan dinding tebing gunung (agar kristal selalu muncul!)",
+    Title = "🧗 Panjat & Tempel Tebing (Cliff Climber)",
+    Desc = "Karakter menempel rapat pada dinding tebing sekaligus memanjat lereng secara otomatis saat mining",
     Default = true,
-    Callback = function(state) State.CliffHugger = state end
+    Callback = function(state)
+        State.AutoCliffClimber = state
+        State.CliffHugger = state
+        State.AutoAdvanceMountain = state
+    end
 })
 
 AutoTab:Toggle({
-    Title = "🧗 Maju & Panjat Lereng (Auto Climb)",
-    Desc = "Karakter otomatis melangkah maju & memanjat kontur lereng gunung tanpa jatuh void",
+    Title = "🛡️ Deteksi Jatuh & Auto Recovery Puncak (Beta)",
+    Desc = "Merekam ketinggian puncak tertinggi dan auto teleport kembali jika terjatuh dari tebing",
     Default = true,
-    Callback = function(state) State.AutoAdvanceMountain = state end
+    Callback = function(state) State.AutoFallRecovery = state end
 })
 
-AutoTab:Toggle({
-    Title = "🖱️ Spam Klik Layar Otomatis",
-    Desc = "Simulasi tap layar / klik mouse otomatis untuk memicu ayunan alat tambang",
-    Default = true,
-    Callback = function(state) State.SpamScreenClick = state end
+AutoTab:Slider({
+    Title = "📏 Toleransi Jarak Jatuh (Studs)",
+    Desc = "Batas jarak penurunan ketinggian dari puncak sebelum pemulihan terpicu (Default: 35)",
+    Step = 1,
+    Value = { Min = 15, Max = 80, Default = 35 },
+    Callback = function(val) State.FallThreshold = val end
+})
+
+AutoTab:Button({
+    Title = "🔄 Reset Titik Puncak Tertinggi",
+    Desc = "Mereset catatan ketinggian puncak untuk memulai pendakian baru dari posisi saat ini",
+    Callback = function()
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            State.MaxPeakAltitudeY = hrp.Position.Y
+            State.MaxPeakCFrame = hrp.CFrame
+            WindUI:Notify({ Title = "Puncak Direset", Content = string.format("Puncak baru disimpan pada Y: %.1f", hrp.Position.Y), Duration = 2 })
+        else
+            State.MaxPeakAltitudeY = -999999
+            State.MaxPeakCFrame = nil
+            WindUI:Notify({ Title = "Puncak Direset", Content = "Catatan puncak telah dibersihkan!", Duration = 2 })
+        end
+    end
 })
 
 AutoTab:Slider({
@@ -1833,27 +1955,7 @@ PlayerTab:Button({
     end
 })
 
-PlayerTab:Button({
-    Title = "🧲 Bring Player Target (Test Client POV)",
-    Desc = "Mencoba membawa player target ke posisi Anda (Tampak di Client POV)",
-    Callback = function()
-        if State.SelectedPlayerName then
-            local targetP = Players:FindFirstChild(State.SelectedPlayerName)
-            local char = LocalPlayer.Character
-            local myHrp = char and char:FindFirstChild("HumanoidRootPart")
-            if targetP and targetP.Character and targetP.Character:FindFirstChild("HumanoidRootPart") and myHrp then
-                pcall(function()
-                    targetP.Character.HumanoidRootPart.CFrame = myHrp.CFrame + Vector3.new(0, 0, 3)
-                end)
-                WindUI:Notify({ 
-                    Title = "🧲 Bring Test (Client POV)", 
-                    Content = "Player " .. State.SelectedPlayerName .. " dipindah di Client POV.", 
-                    Duration = 4 
-                })
-            end
-        end
-    end
-})
+
 
 PlayerTab:Toggle({
     Title = "🔄 Auto Follow / Spectate Player",
@@ -1985,15 +2087,8 @@ BagTab:Toggle({
 })
 
 BagTab:Toggle({
-    Title = "⚡ Instant Remote Sell (RequestSell 'All')",
-    Desc = "Jual langsung dari mana saja via RequestSell('All') tanpa teleport balik",
-    Default = true,
-    Callback = function(state) State.InstantRemoteSell = state end
-})
-
-BagTab:Toggle({
     Title = "🎒 Auto Sell Saat Ransel Penuh",
-    Desc = "Otomatis memicu RequestSell('All') saat ransel terdeteksi penuh",
+    Desc = "Otomatis memicu RequestSell('All') instan saat ransel terdeteksi penuh",
     Default = false,
     Callback = function(state) State.AutoReturnWhenFull = state end
 })
@@ -2039,11 +2134,11 @@ BagTab:Input({
 })
 
 BagTab:Button({
-    Title = "🥞 Tumpuk Kristal Terbaik (Equip-Then-Drop)",
-    Desc = "Pegang kristal terbaik di tas satu per satu lalu tumpuk di titik berdiri saat ini",
+    Title = "🥞 Tumpuk Kristal High-Luck (Equip-Click-Drop)",
+    Desc = "Pegang kristal ber-Luck tertinggi di tas, klik/aktifkan langsung lalu taruh di sekitar titik berdiri saat ini",
     Callback = function()
         local count = stackGoodCrystalsAtCurrentPosition()
-        WindUI:Notify({ Title = "Plot Crystal Stacker", Content = string.format("Memproses penumpukan %d kristal di posisi berdiri saat ini!", count), Duration = 3 })
+        WindUI:Notify({ Title = "Plot Crystal Stacker", Content = string.format("Memproses penumpukan %d kristal ber-Luck tertinggi di plot!", count), Duration = 3 })
     end
 })
 
